@@ -30,12 +30,13 @@ A simulator for the FIRST Tech Challenge robotics competition
             osx
                 [version-number]
                     [appname].dmg
-                    [appname].app
-                        Contents
-                            MacOS
-                                [appname]
-                            Frameworks
-                                [frameworks(osx dlls), if necessary]
-                            Resources
-                                [resources]
-                        Info.plist
+                    [appname].zip
+                        [appname].app
+                            Contents
+                                MacOS
+                                    [appname]
+                                Frameworks
+                                    [frameworks(osx dlls), if necessary]
+                                Resources
+                                    [resources]
+                                Info.plist
