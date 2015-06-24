@@ -7,7 +7,7 @@ struct mesh
         float * coords;
         v3f * verts;
     }
-    uint n_verts;
+        uint n_verts;
     
     uint * indecies;
     uint n_indecies;
@@ -82,12 +82,95 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
     
     if(n_simplex_points == 3)
     {
-        
+        v3f axis = cross(sub(simplex[0], simplex[2]), sub(simplex[1], simplex[2]));
+        v3f norm0 = cross(axis, sub(simplex[0], simplex[2]));
+        v3f norm1 = cross(sub(simplex[0], simplex[2]), axis);
+        v3f to_origin = negative(simpex[2]);
+        if(dot(norm0, to_origin) < 0)
+        {
+            if(dot(norm1, to_origin) < 0)
+            { //middle
+                if(dot(axis, to_origin))
+                {
+                    //top
+                    dir = axis;
+                }
+                else
+                {
+                    //bottom
+                    dir = negative(axis);
+                }
+            }
+            //0-2 side
+            dir = rejection(to_origin, sub(simplex[0], simplex[2]));
+            simplex[1] = simplex[--n_simplex_points];
+        }
+        else
+        {
+            if(dot(norm1, to_origin) > 0)
+            { //1-2 side
+                dir = rejection(to_origin, sub(simplex[1], simplex[2]));
+                simplex[0] = simplex[--n_simplex_points];
+            }
+            assert(0 && "You broke math");
+        }
     }
     else
     {
-        
+        v3f norm0 = cross(sub(simplex[0], simplex[3]), sub(simplex[1], simplex[3]));
+        v3f norm1 = cross(sub(simplex[1], simplex[3]), sub(simplex[2], simplex[3]));
+        v3f norm2 = cross(sub(simplex[2], simplex[3]), sub(simplex[0], simplex[3]));
+        v3f to_origin = negative(simpex[3]);
+        if(dot(norm0, to_origin) < 0)
+        {
+            if(dot(norm1, to_origin) < 0)
+            {
+                if(dot(norm2, to_origin) < 0)
+                { //inside
+                    return true;
+                }
+                else
+                {
+                    dir = norm2;
+                    simplex[1] = simplex[--n_simplex_points];
+                }
+            }
+            else if(dot(norm2, to_origin) < 0)
+            {
+                dir = norm1;
+                simplex[0] = simplex[--n_simplex_points];
+            }
+            else
+            {
+                dir = rejection(to_origin, sub(simplex[2], simplex[3]));
+                simplex[1] = simplex[--n_simplex_points];
+                simplex[0] = simplex[--n_simplex_points];
+            }
+        }
+        else if(dot(norm1, to_origin) < 0)
+        {
+            if(dot(norm2, to_origin) < 0)
+            {
+                dir = norm0;
+                simplex[2] = simplex[--n_simplex_points];
+            }
+            else
+            {
+                dir = rejection(to_origin, sub(simplex[0], simplex[3]));
+                simplex[2] = simplex[--n_simplex_points];
+                simplex[1] = simplex[--n_simplex_points];
+            }
+        }
+        else if(dot(norm2, to_origin) < 0)
+        {
+            dir = rejection(to_origin, sub(simplex[1], simplex[3]));
+            simplex[2] = simplex[--n_simplex_points];
+            simplex[0] = simplex[--n_simplex_points];
+        }
+        assert(0 && "origin is path the new simplex point");
     }
+    
+    return false;
 }
 
 //returns the number of collision points
@@ -109,7 +192,7 @@ inline int collisionPoints(physics_object a, physics_object b, mesh * mesh_list,
             support_return initial_support = support(a, a_group, b, b_group, mesh_list, dir);
             if(initial_support.distance < 0) continue;
             simplex[n_simplex_points++] = initial_support.point;
-            dir = negative(dir);
+            dir = negative(simplex[0]);
             
             //the 2 point case can only happen once
             support_return second_support = support(a, a_group, b, b_group, mesh_list, dir);
@@ -125,7 +208,7 @@ inline int collisionPoints(physics_object a, physics_object b, mesh * mesh_list,
                 
                 if(doSimplex(simplex, n_simplex_points, dir))
                 {
-                    out[n_collision_points++] = ;
+                    out[n_collision_points++] = simplex[3]; //TODO: use better contact point
                     break;
                 }
             }
