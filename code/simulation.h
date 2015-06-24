@@ -1,3 +1,4 @@
+#include "meth.h"
 #include "misc.h"
 
 struct mesh
@@ -6,8 +7,8 @@ struct mesh
     {
         float * coords;
         v3f * verts;
-    }
-        uint n_verts;
+    };
+    uint n_verts;
     
     uint * indecies;
     uint n_indecies;
@@ -49,7 +50,7 @@ inline support_return support(physics_object a, int a_group, mesh * mesh_list, v
     
     for(uint v = a_mesh.convex_groups[a_group]+1; v < a_mesh.convex_groups[a_group+1]; v++)
     {
-        proj = dot(a_mesh.verts[v], dir);
+        float proj = dot(a_mesh.verts[v], dir);
         if(proj > highest.distance)
         {
             highest.distance = proj;
@@ -64,7 +65,7 @@ inline support_return support(physics_object a, int a_group, mesh * mesh_list, v
 }
 
 //GJK support function for the Minkowski differnce of two convex polygonal objects
-inline v3f support(physics_object a, int a_group, physics_object b, int b_group, mesh * mesh_list, v3f dir)
+inline support_return support(physics_object a, int a_group, physics_object b, int b_group, mesh * mesh_list, v3f dir)
 {
     support_return a_support = support(a, a_group, mesh_list, dir);
     support_return b_support = support(b, b_group, mesh_list, negative(dir));
@@ -85,7 +86,7 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
         v3f axis = cross(sub(simplex[0], simplex[2]), sub(simplex[1], simplex[2]));
         v3f norm0 = cross(axis, sub(simplex[0], simplex[2]));
         v3f norm1 = cross(sub(simplex[0], simplex[2]), axis);
-        v3f to_origin = negative(simpex[2]);
+        v3f to_origin = negative(simplex[2]);
         if(dot(norm0, to_origin) < 0)
         {
             if(dot(norm1, to_origin) < 0)
@@ -120,7 +121,7 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
         v3f norm0 = cross(sub(simplex[0], simplex[3]), sub(simplex[1], simplex[3]));
         v3f norm1 = cross(sub(simplex[1], simplex[3]), sub(simplex[2], simplex[3]));
         v3f norm2 = cross(sub(simplex[2], simplex[3]), sub(simplex[0], simplex[3]));
-        v3f to_origin = negative(simpex[3]);
+        v3f to_origin = negative(simplex[3]);
         if(dot(norm0, to_origin) < 0)
         {
             if(dot(norm1, to_origin) < 0)
@@ -174,10 +175,8 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
 }
 
 //returns the number of collision points
-inline int collisionPoints(physics_object a, physics_object b, mesh * mesh_list, v3f * out)
+inline bool8 colliding(physics_object a, physics_object b, mesh * mesh_list)
 {
-    int n_collision_points = 0;
-    
     mesh & a_mesh = mesh_list[a.mesh_id];
     mesh & b_mesh = mesh_list[b.mesh_id];
 
@@ -198,7 +197,7 @@ inline int collisionPoints(physics_object a, physics_object b, mesh * mesh_list,
             support_return second_support = support(a, a_group, b, b_group, mesh_list, dir);
             if(second_support.distance < 0) continue;
             simplex[n_simplex_points++] = second_support.point;
-            dir = rejection(sub(simplex[0], origin), sub(simplex[0], simplex[1]));
+            dir = rejection(negative(simplex[0]), sub(simplex[0], simplex[1]));
             
             for ever
             {
@@ -208,14 +207,13 @@ inline int collisionPoints(physics_object a, physics_object b, mesh * mesh_list,
                 
                 if(doSimplex(simplex, n_simplex_points, dir))
                 {
-                    out[n_collision_points++] = simplex[3]; //TODO: use better contact point
-                    break;
+                    return true;
                 }
             }
         }
     }
     
-    return n_collision_points;
+    return false;
 }
 
 //TODO: swept objects
