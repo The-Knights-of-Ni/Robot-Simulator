@@ -1,6 +1,12 @@
 #include "meth.h"
 #include "misc.h"
 
+struct box
+{
+    v3f upper;
+    v3f lower;
+};
+
 struct mesh
 {
     union
@@ -13,7 +19,10 @@ struct mesh
     uint * indecies;
     uint n_indecies;
     
-    int * convex_groups;
+    uint * convex_indecies; //sorted starting with the lowest x
+    int * convex_starts;
+    int * convex_ends;
+    box * bounding_boxes;
     uint n_convex_groups;
 };
 
@@ -30,6 +39,11 @@ struct physics_object
     v3f velocity;
 };
 
+void generateConvexGroups()
+{
+    
+}
+
 struct support_return
 {
     v3f point;
@@ -44,17 +58,17 @@ inline support_return support(physics_object a, int a_group, mesh * mesh_list, v
     mesh & a_mesh = mesh_list[a.mesh_id];
     
     support_return highest = {
-        a_mesh.verts[a_mesh.convex_groups[a_group]],
-        dot(a_mesh.verts[a_mesh.convex_groups[a_group]], dir)
+        a_mesh.verts[a_mesh.convex_indecies[a_group]],
+        dot(a_mesh.verts[a_mesh.convex_indecies[a_group]], dir)
     };
     
-    for(uint v = a_mesh.convex_groups[a_group]+1; v < a_mesh.convex_groups[a_group+1]; v++)
+    for(uint v = a_mesh.convex_starts[a_group]; v < a_mesh.convex_ends[a_group]; v++)
     {
-        float proj = dot(a_mesh.verts[v], dir);
+        float proj = dot(a_mesh.verts[a_mesh.convex_indecies[v]], dir);
         if(proj > highest.distance)
         {
             highest.distance = proj;
-            highest.point = a_mesh.verts[v];
+            highest.point = a_mesh.verts[a_mesh.convex_indecies[v]];
         }
     }
     
@@ -174,16 +188,17 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
     return false;
 }
 
-//returns the number of collision points
-inline bool8 colliding(physics_object a, physics_object b, mesh * mesh_list)
+inline v3f colliding(physics_object a, physics_object b, mesh * mesh_list)
 {
     mesh & a_mesh = mesh_list[a.mesh_id];
     mesh & b_mesh = mesh_list[b.mesh_id];
-
+    
+    float nearest = -1.0;
+    
     for(int a_group = 0; a_group < a_mesh.n_convex_groups; a_group++)
     {
         for(int b_group = 0; b_group < b_mesh.n_convex_groups; b_group++)
-        {
+        {//TODO: possible use bounding boxes to speed this up
             v3f dir = {1.0, 0.0, 0.0};
             v3f simplex[4];
             int n_simplex_points = 0;
@@ -206,10 +221,13 @@ inline bool8 colliding(physics_object a, physics_object b, mesh * mesh_list)
                 simplex[n_simplex_points++] = new_support.point;
                 
                 if(doSimplex(simplex, n_simplex_points, dir))
-                {
+                { //intersection found
                     return true;
                 }
             }
+            //these two conxex hulls do not intersect
+            if()
+            for()
         }
     }
     
