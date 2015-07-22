@@ -50,9 +50,9 @@ PFNGLUNIFORM1IPROC glUniform1i = 0;
 PFNGLUNIFORMMATRIX4FVPROC glUniformMatrix4fv = 0;
 
 void loadGLFunctions()
-{        
+{
     glDebugMessageCallbackARB = (PFNGLDEBUGMESSAGECALLBACKARBPROC) wglGetProcAddress("glDebugMessageCallbackARB");
-        
+
     glGenBuffers = (PFNGLGENBUFFERSPROC) wglGetProcAddress("glGenBuffers");
     glBufferData = (PFNGLBUFFERDATAPROC) wglGetProcAddress("glBufferData");
     glBindBuffer = (PFNGLBINDBUFFERPROC) wglGetProcAddress("glBindBuffer");
@@ -60,7 +60,7 @@ void loadGLFunctions()
     glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC) wglGetProcAddress("glEnableVertexAttribArray");
     glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC) wglGetProcAddress("glGenVertexArrays");
     glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC) wglGetProcAddress("glBindVertexArray");
-        
+
     glCreateShader = (PFNGLCREATESHADERPROC) wglGetProcAddress("glCreateShader");
     glShaderSource = (PFNGLSHADERSOURCEPROC) wglGetProcAddress("glShaderSource");
     glCompileShader = (PFNGLCOMPILESHADERPROC) wglGetProcAddress("glCompileShader");
@@ -89,10 +89,10 @@ void loadGLFunctions()
     glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC) wglGetProcAddress("glGetUniformLocation");
     glUniform1i = (PFNGLUNIFORM1IPROC) wglGetProcAddress("glUniform1i");
     glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC) wglGetProcAddress("glUniformMatrix4fv");
-    
+
     //TODO: I should probably actualy check these and give a message that the function could not be loaded
     assert(glDebugMessageCallbackARB);
-        
+
     assert(glGenBuffers != 0);
     assert(glBufferData != 0);
     assert(glBindBuffer != 0);
@@ -100,7 +100,7 @@ void loadGLFunctions()
     assert(glEnableVertexAttribArray);
     assert(glGenVertexArrays);
     assert(glBindVertexArray);
-        
+
     assert(glCreateShader != 0);
     assert(glShaderSource != 0);
     assert(glCompileShader);
