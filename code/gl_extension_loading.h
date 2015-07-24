@@ -5,6 +5,7 @@
 
 #ifdef _WIN32
 #include "gl/wglext.h"
+#include <Wingdi.h>
 
 //opengl functions that require an HDC to get a pointer to
 PFNGLDEBUGMESSAGECALLBACKARBPROC glDebugMessageCallbackARB = 0;
