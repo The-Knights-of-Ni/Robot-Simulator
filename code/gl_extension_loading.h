@@ -3,6 +3,11 @@
 
 #include <SDL_opengl.h>
 
+//#ifdef WHATEVER_THE_OSX_THINGY_IS_CALLED
+void loadGLFunctions()
+{}
+//#endif
+
 #ifdef _WIN32
 #include "gl/wglext.h"
 

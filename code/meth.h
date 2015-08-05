@@ -163,3 +163,15 @@ inline v3f applyQuaternion(v4f q, v3f p)
 {
     return multiply(quaternionToMatrix(q), p);
 }
+
+//NOTE: this is fast for small values of a, there are better algorithms for random 32 bit integers
+//ceiling of the log base 2
+inline uint clog_2(uint a)
+{
+    uint log = 0;
+    for(; a; log++)
+    {
+        a >>= 1;
+    }
+    return log;
+}

@@ -2,6 +2,8 @@
 #define MISC
 
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
 #define min(a, b) (((a) < (b))?(a):(b))
 #define max(a, b) (((a) > (b))?(a):(b))
@@ -31,7 +33,6 @@ typedef double float64;
 #endif
 
 #ifdef DEBUG
-#include <stdio.h>
 #define assert(this_is_true) if(!(this_is_true)) {printf("failed assertion: %s", #this_is_true); crash;}
 #else
 #define assert(this_is_true)

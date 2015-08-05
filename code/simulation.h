@@ -20,8 +20,11 @@ struct mesh
     uint n_indecies;
     
     uint * convex_indecies; //sorted starting with the lowest x
-    int * convex_starts;
-    int * convex_ends;
+    int * convex_starts; //stores the edges of each convex group
+    uint * convex_neighbors_starts; //table of the first edge in convex_edges for a given vert
+    uint * n_convex_neighbors; //number of neighbors for each vert
+    uint * convex_neighbors; //index to the neighbors
+    uint * n_total_convex_neighbors; //the total number of convex_neighbors
     box * bounding_boxes;
     uint n_convex_groups;
 };
@@ -175,11 +178,41 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
     return false;
 }
 
-typedef struct
+struct convex_hull_range
 {
     uint left_edge;
     uint right_edge;
-} convex_hull_range;
+};
+
+struct convex_neighbors_link
+{
+    uint neighbor;
+    uint next_link;
+};
+
+void addOneWayEdgeToLinkedLists(uint * first_neighbor_links, convex_neighbors_link * neighbors, uint & n_neighbor_links, uint v1, uint v2, uint start_index)
+{
+    if(first_neighbor_links[v1-start_index] == 0)
+    {
+        first_neighbor_links[v1-start_index] = n_neighbor_links;
+    }
+    else
+    {
+        uint current_link = first_neighbor_links[v1-start_index];
+        for(; neighbors[current_link].next_link != 0;
+            current_link = neighbors[current_link].next_link);
+        neighbors[current_link].next_link = n_neighbor_links;
+            
+    }
+    neighbors[n_neighbor_links++].next_link = 0;
+    neighbors[n_neighbor_links++].neighbor = v2;
+}
+
+void addEdgeToLinkedLists(uint * first_neighbor_links, convex_neighbors_link * neighbors, uint & n_neighbor_links, uint v1, uint v2, uint start_index)
+{
+    addOneWayEdgeToLinkedLists(first_neighbor_links,neighbors, n_neighbor_links, v1, v2, start_index);
+    addOneWayEdgeToLinkedLists(first_neighbor_links,neighbors, n_neighbor_links, v2, v1, start_index);
+}
 
 //m.convex_indecies and such must be valid pointers be valid pointers
 void convexHull(mesh m, uint start_index, uint end_index, void * free_memory)
@@ -227,9 +260,9 @@ void convexHull(mesh m, uint start_index, uint end_index, void * free_memory)
         for(int h = 0; h < 3; h++) offset_tables[i+h*(2<<11)] += histograms[i-1+h*(2<<11)]+offset_tables[i-1+h*(2<<11)];
     }
     
-    uint * hull_indecies = m.convex_indecies + m.convex_ends[m.n_convex_groups-1];
-    uint * sorted_indecies = (uint *) ((char *) free_memory);
+    uint * hull_indecies = m.convex_indecies + m.convex_starts[m.n_convex_groups];
     free_memory = (void *)((byte *) free_memory + sizeof(uint)*n_hull_verts);
+    uint * sorted_indecies = (uint *) ((char *) free_memory);
     
     for(uint i = start_index; i < end_index; i++)
     {
@@ -275,12 +308,21 @@ void convexHull(mesh m, uint start_index, uint end_index, void * free_memory)
     //hull_indecies is sorted by increasing x
     
     convex_hull_range * ranges = (convex_hull_range *) free_memory;
+    free_memory = (void *) (ranges + 2*(clog_2(n_hull_verts))); //at most one node of each unexplored branch will be stored
     ranges[0].left_edge = 0;
     ranges[0].left_edge = n_hull_verts;
     uint n_ranges = 1;
     
+    uint * first_neighbor_links = (uint *) free_memory; //table of first links for each vert
+    //NOTE: this^ can be replaced with a hash table for to save memory
+    memset(free_memory, 0, sizeof(first_neighbor_links)*n_hull_verts);
+    free_memory = (void *) ((uint *) free_memory + n_hull_verts);
+    
+    convex_neighbors_link * neighbors = (convex_neighbors_link *) free_memory-1;
+    uint n_neighbor_links = 1;
+    
     { //connect the two halves and remove useless points
-        void * temp_free_memory = (void *)((convex_hull_range *) free_memory + n_ranges);
+        void * temp_free_memory = (void *)((convex_neighbors_link *) free_memory + n_neighbor_links);
         
         uint left_edge = ranges[--n_ranges].left_edge;
         uint right_edge = ranges[n_ranges].right_edge;
@@ -347,6 +389,8 @@ void convexHull(mesh m, uint start_index, uint end_index, void * free_memory)
             }
         }
     stop_searching_for_bridge:;
+                
+        addEdgeToLinkedLists(first_neighbor_links, neighbors, n_neighbor_links, left_bridge_vert, right_bridge_vert, start_index);
         
         //gift wrap connection
         v3f current_axis = sub(m.verts[right_bridge_vert], m.verts[left_bridge_vert]);
@@ -359,7 +403,6 @@ void convexHull(mesh m, uint start_index, uint end_index, void * free_memory)
         uint inmost_right_vert = right_bridge_vert;
         uint outmost_left_vert = left_bridge_vert;
         uint outmost_right_vert = right_bridge_vert;
-
         
         v3f * connection_points = (v3f *) temp_free_memory;
         uint n_connection_points = 0;
@@ -404,7 +447,10 @@ void convexHull(mesh m, uint start_index, uint end_index, void * free_memory)
             }
             
             connection_points[n_connection_points++] = m.verts[hull_indecies[next_vert]];
-            //the normal should face outward
+            
+            //add edges
+            addEdgeToLinkedLists(first_neighbor_links,neighbors, n_neighbor_links, next_vert, left_bridge_vert, start_index);
+            addEdgeToLinkedLists(first_neighbor_links,neighbors, n_neighbor_links, next_vert, right_bridge_vert, start_index);
             
             if(next_vert < middle_vert)
             { //left side
@@ -487,8 +533,30 @@ void convexHull(mesh m, uint start_index, uint end_index, void * free_memory)
         ranges[n_ranges].right_edge = middle_edge;
         n_ranges++;
     }
+    
+    for(int i = 0; i < n_hull_verts; i++)
+    {
+        if(first_neighbor_links[hull_indecies[i]-start_index] != 0)
+        {
+            uint current_link = first_neighbor_links[hull_indecies[i]-start_index];
+            
+            uint current_convex_index = m.convex_starts[m.n_convex_groups]+i;
+            m.convex_starts[current_convex_index] = m.n_convex_neighbors[current_convex_index]++;
+            for(; current_link != 0; current_link = neighbors[current_link].next_link)
+            {
+                m.convex_neighbors[m.n_total_convex_neighbors[current_convex_index]++] = neighbors[current_link].neighbor;
+            }
+        }
+        else
+        {
+            printf("error, vertex with no edges added to convex hull\n");
+        }
+    }
+    m.convex_starts[m.n_convex_groups+1] = m.convex_starts[m.n_convex_groups]+n_hull_verts;
+    m.n_convex_groups++;
 }
 
+//TODO: use neighbor data to speed up search
 //GJK support function for one convex object
 inline support_return support(physics_object a, int a_group, mesh * mesh_list, v3f dir)
 {
@@ -501,7 +569,7 @@ inline support_return support(physics_object a, int a_group, mesh * mesh_list, v
         dot(a_mesh.verts[a_mesh.convex_indecies[a_group]], dir)
     };
     
-    for(uint v = a_mesh.convex_starts[a_group]; v < a_mesh.convex_ends[a_group]; v++)
+    for(uint v = a_mesh.convex_starts[a_group]; v < a_mesh.convex_starts[a_group+1]; v++)
     {
         float proj = dot(a_mesh.verts[a_mesh.convex_indecies[v]], dir);
         if(proj > highest.distance)
@@ -531,12 +599,10 @@ inline support_return support(physics_object a, int a_group, physics_object b, i
 }
 
 //TODO: generate contact points
-inline v3f colliding(physics_object a, physics_object b, mesh * mesh_list)
+inline bool isColliding(physics_object a, physics_object b, mesh * mesh_list)
 {
     mesh & a_mesh = mesh_list[a.mesh_id];
     mesh & b_mesh = mesh_list[b.mesh_id];
-    
-    float nearest = -1.0;
     
     for(int a_group = 0; a_group < a_mesh.n_convex_groups; a_group++)
     {
@@ -568,13 +634,34 @@ inline v3f colliding(physics_object a, physics_object b, mesh * mesh_list)
                     return true;
                 }
             }
-            //these two conxex hulls do not intersect
-            if()
-            for()
+            //these two convex hulls do not intersect
         }
     }
     
     return false;
+}
+
+//NOTE: the objects must not be colliding
+//find the point(s if multiple points are equidistant) on each hull that is nearest to the other hull
+inline v3f findContactPoint(physics_object a, physics_object b, mesh * mesh_list)
+{ //TODO: use previous knowledge to pick start parameters
+    mesh & a_mesh = mesh_list[a.mesh_id];
+    mesh & b_mesh = mesh_list[b.mesh_id];
+    
+    float nearest = -1.0;
+    
+    for(int a_group = 0; a_group < a_mesh.n_convex_groups; a_group++)
+    {
+        for(int b_group = 0; b_group < b_mesh.n_convex_groups; b_group++)
+        { //TODO: possibly use bounding boxes to speed this up
+            uint current_point = 0;
+            
+            for ever
+            {
+                
+            }
+        }
+    }
 }
 
 //TODO: swept objects
