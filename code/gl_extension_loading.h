@@ -36,6 +36,7 @@ declareGLFunction(void, glActiveTexture, (GLenum texture));
 declareGLFunction(GLuint, glGetUniformLocation, (GLuint program, const GLchar * name));
 declareGLFunction(void, glUniform1i, (GLuint location, GLint v0));
 declareGLFunction(void, glUniform2f, (GLuint location, GLfloat v0, GLfloat v1));
+declareGLFunction(void, glUniform3f, (GLuint location, GLfloat v0, GLfloat v1, GLfloat v2));
 declareGLFunction(void, glUniformMatrix4fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value));
 
 void loadGLFunctions()
@@ -69,6 +70,7 @@ void loadGLFunctions()
     glGetUniformLocation = (glGetUniformLocation_Func) SDL_GL_GetProcAddress("glGetUniformLocation");
     glUniform1i = (glUniform1i_Func) SDL_GL_GetProcAddress("glUniform1i");
     glUniform2f = (glUniform2f_Func) SDL_GL_GetProcAddress("glUniform2f");
+    glUniform3f = (glUniform3f_Func) SDL_GL_GetProcAddress("glUniform3f");
     glUniformMatrix4fv = (glUniformMatrix4fv_Func) SDL_GL_GetProcAddress("glUniformMatrix4fv");
 
     //TODO: I should probably actualy check these and give a message that the function could not be loaded
@@ -97,6 +99,7 @@ void loadGLFunctions()
     assert(glGetUniformLocation);
     assert(glUniform1i);
     assert(glUniform2f);
+    assert(glUniform3f);
     assert(glUniformMatrix4fv);
 }
 #endif

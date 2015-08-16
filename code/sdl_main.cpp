@@ -22,6 +22,8 @@
 //default window size
 static int window_width = 640;
 static int window_height = 480;
+static float wx_scale = 2.0/window_width;
+static float wy_scale = 2.0/window_height;
 
 void APIENTRY glErrorCallback(GLenum source, GLenum type, uint id, GLenum severity, GLsizei length, const char * message, void * userParam)
 {
@@ -142,17 +144,26 @@ struct id_to_index
     uint index;
     uint next; //collision handling
 };
-    
+
+bool left_click = 0;
+bool prev_left_click = 0;
+
 #define font_bitmap_width 128
 #define font_bitmap_height 256
 
 static stbtt_packedchar * font_pack_data;
 static stbtt_fontinfo font_info;
 
+int font_ascent;
+int font_descent;
+int font_line_gap;
+
 static GLuint ui_uv0;
 static GLuint ui_uv1;
 static GLuint ui_c0;
 static GLuint ui_c1;
+static GLuint ui_color;
+static GLuint ui_mode;
 
 float getTextWidthInWindowPixles(char * s)
 {
@@ -174,7 +185,6 @@ float getTextWidthInWindowPixles(char * s)
 
 float getTextWidthInWindowUnits(char * s)
 {
-    float wx_scale = 2.0/window_width;
     return getTextWidthInWindowPixles(s)*wx_scale;
 }
 
@@ -187,10 +197,7 @@ void drawText(float px0, float py0, char * s)
                 
         float ibw = 1.0/font_bitmap_width;
         float ibh = 1.0/font_bitmap_height;
-                
-        float wx_scale = 2.0/window_width;
-        float wy_scale = 2.0/window_height;
-                
+        
         float x0 = (c_data.x0-0.5)*ibw;
         float y0 = (c_data.y0-0.5)*ibh;
         float x1 = c_data.x1*ibw;
@@ -225,6 +232,41 @@ void drawText(float px0, float py0, char * s)
         else break;
     }
     //glEnd();
+}
+
+bool doButtonNW(char * string, float x0, float y1, float x_padding, float y_padding)
+{    
+    float width = getTextWidthInWindowUnits(string);            
+    
+    x_padding *= wx_scale;
+    y_padding *= wy_scale;
+    
+    int x;
+    int y;
+    SDL_GetMouseState(&x, &y);
+    float mx = x*wx_scale-1.0;
+    float my = -(y*wy_scale-1.0);
+    
+    float y0 = y1 - (stbtt_ScaleForPixelHeight(&font_info, 16)*wy_scale*(
+                          font_ascent -
+                          font_descent)+y_padding*2);
+    float x1 = x0+width+x_padding*2;
+    
+    glUniform1i(ui_mode, 0);
+    bool over = mx > x0 && mx < x1 && my > y0 && my < y1;
+    if(over) glUniform3f(ui_color, 1.0, 1.0, 1.0);
+    else glUniform3f(ui_color, 0.5, 0.5, 0.5);
+    glUniform2f(ui_uv0, 0, 0);
+    glUniform2f(ui_uv1, 0, 0);
+    glUniform2f(ui_c0, x0, y0);
+    glUniform2f(ui_c1, x1, y1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    
+    glUniform1i(ui_mode, 1);
+    glUniform3f(ui_color, 0.0, 0.0, 0.0);
+    drawText(x0+x_padding, y1-(stbtt_ScaleForPixelHeight(&font_info, 16)*wy_scale*font_ascent+y_padding), string);
+    
+    return over && !left_click && prev_left_click;
 }
 
 int main(int n_arg, char * args[])
@@ -348,6 +390,8 @@ int main(int n_arg, char * args[])
         }
         stbtt_PackEnd(&pc);
         
+        stbtt_GetFontVMetrics(&font_info, &font_ascent, &font_descent, &font_line_gap);
+        
         // char c = 'j';
         // uint16 x0 = font_pack_data[c-32].x0;
         // uint16 y0 = font_pack_data[c-32].y0;
@@ -459,6 +503,9 @@ int main(int n_arg, char * args[])
 
         ui_c0 = glGetUniformLocation(ui_program, "c0");
         ui_c1 = glGetUniformLocation(ui_program, "c1");
+
+        ui_color = glGetUniformLocation(ui_program, "color");
+        ui_mode = glGetUniformLocation(ui_program, "mode");
         
         glDetachShader(ui_program, vertex_shader);
         glDetachShader(ui_program, fragment_shader);
@@ -596,16 +643,29 @@ int main(int n_arg, char * args[])
     
     for ever
     {
+        prev_left_click = left_click;
         while (SDL_PollEvent(&event))
         {
             switch (event.type)
             {
+                case SDL_MOUSEBUTTONDOWN:
+                {
+                    if (event.button.button == SDL_BUTTON_LEFT) left_click = 1;
+                    break;
+                }
+                case SDL_MOUSEBUTTONUP:
+                {
+                    if (event.button.button == SDL_BUTTON_LEFT) left_click = 0;
+                    break;
+                }
                 case SDL_WINDOWEVENT:
                 {
                     switch(event.window.event)
                     {
                         case SDL_WINDOWEVENT_RESIZED:
                             SDL_GL_GetDrawableSize(window, &window_width, &window_height);
+                            wx_scale = 2.0/window_width;
+                            wy_scale = 2.0/window_height;
                             {
                                 float aspect_ratio = (float) window_width/window_height;
                                 float n = 0.5;
@@ -702,7 +762,16 @@ int main(int n_arg, char * args[])
         glVertexAttribPointer(attrib_pos, 2, GL_FLOAT, GL_FALSE, 8, 0);
         
         //drawui here
-        drawText(-getTextWidthInWindowUnits("hello")/2.0, 0, "hello");
+        float x_pos = -1.0;
+        if(doButtonNW("hello", x_pos, 1.0, 4, 2))
+        {
+            angle0 += 0.1;
+        }
+        x_pos += getTextWidthInWindowUnits("hello")+(2*4)*wx_scale;
+        if(doButtonNW("goodbye", x_pos, 1.0, 4, 2))
+        {
+            angle0 -= 0.1;
+        }
         
         SDL_GL_SwapWindow(window);
     }
