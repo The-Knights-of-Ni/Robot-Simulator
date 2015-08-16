@@ -77,7 +77,7 @@ GLuint initShader(const char * shader_source, GLenum shader_type)
         int info_log_size;
         glGetShaderiv(shader, 0, &info_log_size);
         glGetShaderInfoLog(shader, info_log_size, 0, info_log);
-        printf("%s\n", info_log);
+        printf("error in %s shader\n%s\n", (shader_type == GL_VERTEX_SHADER) ? "vertex" : "fragment", info_log);
         exit(EXIT_FAILURE);
     }
 
@@ -295,6 +295,7 @@ int main(int n_arg, char * args[])
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 32);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     //SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
     
     SDL_GLContext context = SDL_GL_CreateContext(window);
@@ -306,9 +307,9 @@ int main(int n_arg, char * args[])
     
     loadGLFunctions();
     
-    #ifdef DEBUG
+    #if defined(DEBUG) && defined(_WIN32)
     glDebugMessageCallbackARB(glErrorCallback, 0);
-    //glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT);
     #endif
     
     void * memory = (byte *) malloc(1*gigabyte);
@@ -382,7 +383,6 @@ int main(int n_arg, char * args[])
             
             //STBTT_free(rects, &pc->user_allocator_context);
         }
-
         
         if(!error)
         {
@@ -432,11 +432,10 @@ int main(int n_arg, char * args[])
         char * vertex_shader_source = (char *) temp_memory;
         readTextFile(vertex_shader_source, "shader.vert");
         GLuint vertex_shader = initShader(vertex_shader_source, GL_VERTEX_SHADER);
-
+        
         char * fragment_shader_source = (char *) temp_memory;
         int fragment_shader_source_size = readTextFile(vertex_shader_source, "shader.frag");
-        temp_memory = (void *) ((char *) fragment_shader_source_size);
-        
+        temp_memory = (void *) ((char *) temp_memory+fragment_shader_source_size);        
         GLuint fragment_shader = initShader(fragment_shader_source, GL_FRAGMENT_SHADER);
         
         program = glCreateProgram();
@@ -475,8 +474,7 @@ int main(int n_arg, char * args[])
 
         char * fragment_shader_source = (char *) temp_memory;
         int fragment_shader_source_size = readTextFile(vertex_shader_source, "ui_shader.frag");
-        temp_memory = (void *) ((char *) fragment_shader_source_size);
-        
+        temp_memory = (void *) ((char *) temp_memory+fragment_shader_source_size);
         GLuint fragment_shader = initShader(fragment_shader_source, GL_FRAGMENT_SHADER);
         
         ui_program = glCreateProgram();
@@ -511,7 +509,7 @@ int main(int n_arg, char * args[])
         glDetachShader(ui_program, fragment_shader);
         glDeleteShader(vertex_shader);
         glDeleteShader(fragment_shader);
-    }
+    }        
     
     {
         glEnable(GL_DEPTH_TEST);

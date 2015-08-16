@@ -4,9 +4,10 @@
 #include <SDL.h>
 #include <SDL_opengl.h>
 
-#define declareGLFunction(rval, ext, args) typedef rval (APIENTRY * ext##_Func)args; ext##_Func ext = 0;
+#define declareGLFunction(rval, ext, args)  typedef rval (APIENTRY * ext##_Func)args; ext##_Func ext = 0;
 
 //opengl functions that require an HDC to get a pointer to
+#ifdef _WIN32
 declareGLFunction(void, glDebugMessageCallbackARB, (GLDEBUGPROCARB callback, const void* userParam));
 
 declareGLFunction(void, glGenBuffers, (GLsizei n, const GLuint * buffers));
@@ -14,9 +15,11 @@ declareGLFunction(void, glBufferData, (GLenum target, GLsizei ptrsize, const GLv
 declareGLFunction(void, glBindBuffer, (GLenum target, GLuint buffer));
 declareGLFunction(void, glVertexAttribPointer, (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid * pointer));
 declareGLFunction(void, glEnableVertexAttribArray, (GLuint index));
+#endif
 declareGLFunction(void, glGenVertexArrays, (GLsizei n, GLuint *arrays));
 declareGLFunction(void, glBindVertexArray, (GLuint array));
 
+#ifdef _WIN32
 declareGLFunction(GLuint, glCreateShader, (GLenum shaderType));
 declareGLFunction(void, glShaderSource, (GLuint shader, GLsizei count, const GLchar * const *string, const GLint *length));
 declareGLFunction(void, glCompileShader, (GLuint shader));
@@ -38,9 +41,10 @@ declareGLFunction(void, glUniform1i, (GLuint location, GLint v0));
 declareGLFunction(void, glUniform2f, (GLuint location, GLfloat v0, GLfloat v1));
 declareGLFunction(void, glUniform3f, (GLuint location, GLfloat v0, GLfloat v1, GLfloat v2));
 declareGLFunction(void, glUniformMatrix4fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value));
-
+#endif
 void loadGLFunctions()
 {
+    #ifdef _WIN32
     glDebugMessageCallbackARB = (glDebugMessageCallbackARB_Func) SDL_GL_GetProcAddress("glDebugMessageCallbackARB");
 
     glGenBuffers = (glGenBuffers_Func) SDL_GL_GetProcAddress("glGenBuffers");
@@ -48,9 +52,11 @@ void loadGLFunctions()
     glBindBuffer = (glBindBuffer_Func) SDL_GL_GetProcAddress("glBindBuffer");
     glVertexAttribPointer = (glVertexAttribPointer_Func) SDL_GL_GetProcAddress("glVertexAttribPointer");
     glEnableVertexAttribArray = (glEnableVertexAttribArray_Func) SDL_GL_GetProcAddress("glEnableVertexAttribArray");
+    #endif
     glGenVertexArrays = (glGenVertexArrays_Func) SDL_GL_GetProcAddress("glGenVertexArrays");
     glBindVertexArray = (glBindVertexArray_Func) SDL_GL_GetProcAddress("glBindVertexArray");
-
+    
+    #ifdef _WIN32
     glCreateShader = (glCreateShader_Func) SDL_GL_GetProcAddress("glCreateShader");
     glShaderSource = (glShaderSource_Func) SDL_GL_GetProcAddress("glShaderSource");
     glCompileShader = (glCompileShader_Func) SDL_GL_GetProcAddress("glCompileShader");
@@ -72,18 +78,21 @@ void loadGLFunctions()
     glUniform2f = (glUniform2f_Func) SDL_GL_GetProcAddress("glUniform2f");
     glUniform3f = (glUniform3f_Func) SDL_GL_GetProcAddress("glUniform3f");
     glUniformMatrix4fv = (glUniformMatrix4fv_Func) SDL_GL_GetProcAddress("glUniformMatrix4fv");
-
+    #endif
+    
     //TODO: I should probably actualy check these and give a message that the function could not be loaded
+    #ifdef _WIN32
     assert(glDebugMessageCallbackARB);
-
     assert(glGenBuffers != 0);
     assert(glBufferData != 0);
     assert(glBindBuffer != 0);
     assert(glVertexAttribPointer);
     assert(glEnableVertexAttribArray);
+    #endif
     assert(glGenVertexArrays);
     assert(glBindVertexArray);
 
+    #ifdef _WIN32
     assert(glCreateShader != 0);
     assert(glShaderSource != 0);
     assert(glCompileShader);
@@ -101,5 +110,6 @@ void loadGLFunctions()
     assert(glUniform2f);
     assert(glUniform3f);
     assert(glUniformMatrix4fv);
+    #endif
 }
 #endif
