@@ -1,7 +1,33 @@
 #include "misc.h"
+#include <emmintrin.h>
 #include <math.h>
 
+#ifndef METH
+#define METH
+
+#pragma pack(push, 16)
+
+#define pi 3.1415926535897932384626433832795
+
 #define sq(a) ((a)*(a))
+
+struct v2f
+{
+    union
+    {
+        struct
+        {
+            float x;
+            float y;
+        };
+        float data[2];
+    };
+    
+    inline float & operator[](int a)
+    {
+        return data[a];
+    }
+};
 
 struct v3f
 {
@@ -15,7 +41,7 @@ struct v3f
         };
         float data[3];
     };
-
+    
     inline float & operator[](int a)
     {
         return data[a];
@@ -42,7 +68,7 @@ struct v4f
         };
         float data[4];
     };
-
+    
     inline float & operator[](int a)
     {
         return data[a];
@@ -62,7 +88,34 @@ struct m3x3f
         };
         v3f rows[3];
     };
+
+    inline float & operator[](int a)
+    {
+        return data[a];
+    }
 };
+
+struct __attribute__((aligned(16)))  m4x4f
+{
+    union
+    {
+        float data[16];
+        struct
+        {
+            v4f r0;
+            v4f r1;
+            v4f r2;
+            v4f r3;
+        };
+        v4f rows[4];
+    };
+
+    inline float & operator[](int a)
+    {
+        return data[a];
+    }
+};
+#pragma pack(pop)
 
 v3f negative(v3f a)
 {
@@ -159,9 +212,90 @@ inline m3x3f quaternionToMatrix(v4f q)
     return matrix;
 }
 
+inline m4x4f quaternionTo4x4Matrix(v4f q)
+{
+    m4x4f matrix = {
+        1-2*sq(q.j)-2*sq(q.k), 2*(q.i*q.j-q.k*q.r)  , 2*(q.i*q.k+q.j*q.r)  , 0.0,
+        2*(q.i*q.j+q.k*q.r)  , 1-2*sq(q.i)-2*sq(q.k), 2*(q.j*q.k-q.i*q.r)  , 0.0,
+        2*(q.i*q.k+q.j*q.r)  , 2*(q.j*q.k+q.i*q.r)  , 1-2*sq(q.i)-2*sq(q.j), 0.0,
+        0.0                  , 0.0                  , 0.0                  , 1.0,
+    };
+    return matrix;
+}
+
 inline v3f applyQuaternion(v4f q, v3f p)
 {
     return multiply(quaternionToMatrix(q), p);
+}
+
+//matrix multiplication of aligned matrices a and b
+inline m4x4f multiplyA( m4x4f a, m4x4f b)
+{
+    {
+        __m128 a_element = _mm_load1_ps(&a[0]);
+        __m128 b_row = _mm_load_ps((float *) b.rows);
+        __m128 current_row = _mm_mul_ps(a_element, b_row);
+        a_element = _mm_load1_ps(&a[1]);
+        b_row = _mm_load_ps((float *) (b.rows+1));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        a_element = _mm_load1_ps(&a[2]);
+        b_row = _mm_load_ps((float *) (b.rows+2));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        a_element = _mm_load1_ps(&a[3]);
+        b_row = _mm_load_ps((float *) (b.rows+3));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        _mm_store_ps((float *) a.rows, current_row);
+    }
+    
+    {
+        __m128 a_element = _mm_load1_ps(&a[4]);
+        __m128 b_row = _mm_load_ps((float *) b.rows);
+        __m128 current_row = _mm_mul_ps(a_element, b_row);
+        a_element = _mm_load1_ps(&a[5]);
+        b_row = _mm_load_ps((float *) (b.rows+1));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        a_element = _mm_load1_ps(&a[6]);
+        b_row = _mm_load_ps((float *) (b.rows+2));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        a_element = _mm_load1_ps(&a[7]);
+        b_row = _mm_load_ps((float *) (b.rows+3));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        _mm_store_ps((float *) (a.rows+1), current_row);
+    }
+    
+    {
+        __m128 a_element = _mm_load1_ps(&a[8]);
+        __m128 b_row = _mm_load_ps((float *) b.rows);
+        __m128 current_row = _mm_mul_ps(a_element, b_row);
+        a_element = _mm_load1_ps(&a[9]);
+        b_row = _mm_load_ps((float *) (b.rows+1));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        a_element = _mm_load1_ps(&a[10]);
+        b_row = _mm_load_ps((float *) (b.rows+2));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        a_element = _mm_load1_ps(&a[11]);
+        b_row = _mm_load_ps((float *) (b.rows+3));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        _mm_store_ps((float *) (a.rows+2), current_row);
+    }
+    
+    {
+        __m128 a_element = _mm_load1_ps(&a[12]);
+        __m128 b_row = _mm_load_ps((float *) b.rows);
+        __m128 current_row = _mm_mul_ps(a_element, b_row);
+        a_element = _mm_load1_ps(&a[13]);
+        b_row = _mm_load_ps((float *) (b.rows+1));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        a_element = _mm_load1_ps(&a[14]);
+        b_row = _mm_load_ps((float *) (b.rows+2));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        a_element = _mm_load1_ps(&a[15]);
+        b_row = _mm_load_ps((float *) (b.rows+3));
+        current_row = _mm_add_ps(current_row, _mm_mul_ps(a_element, b_row));
+        _mm_store_ps((float *) (a.rows+3), current_row);
+    }
+    
+    return a;
 }
 
 //NOTE: this is fast for small values of a, there are better algorithms for random 32 bit integers
@@ -175,3 +309,22 @@ inline uint clog_2(uint a)
     }
     return log;
 }
+
+/* inline float32 floor(float32 x) */
+/* { */
+/*     __m128 floor_x = _mm_set_ss(x); */
+
+/*     //floor_x = _mm_round_ps(floor_x, _MM_FROUND_TO_NEG_INF);//TODO: use roundps when available */
+/*     floor_x = _mm_cvtepi32_ps(_mm_cvttps_epi32(floor_x)); */
+    
+/*     float32 out; */
+/*     _mm_store_ss(&out, floor_x); */
+/*     return out; */
+/* } */
+
+inline float mod(float x, float base)
+{
+    return x-floor(x/base)*base;
+}
+
+#endif
