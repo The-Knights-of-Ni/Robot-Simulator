@@ -269,6 +269,28 @@ bool doButtonNW(char * string, float x0, float y1, float x_padding, float y_padd
     return over && !left_click && prev_left_click;
 }
 
+void updateCamera(m4x4f * camera)
+{
+    float aspect_ratio = (float) window_width/window_height;
+    float n = 1.5;
+    float fov = pi/180.0*120.0;
+    float f = 2.0;
+    m4x4f perspective = (m4x4f) {
+        tan(pi/2-fov*0.5), 0.0                             , 0.0        ,  0.0,
+        0.0              , (tan(pi/2-fov*0.5))*aspect_ratio, 0.0        ,  0.0,
+        0.0              , 0.0                             , n/(f-n), -1.0,
+        0.0              , 0.0                             , f*n/(f-n),  0.0,
+    };
+    *camera = (m4x4f) {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, -3.0, 1.0,
+    };
+    
+    *camera = multiplyA(*camera, perspective);
+}
+
 int main(int n_arg, char * args[])
 {
     SDL_Init(SDL_INIT_VIDEO);
@@ -555,6 +577,7 @@ int main(int n_arg, char * args[])
     uint n_overflow = 0;
     
     //add model to list and index table
+    mesh test_mesh;
     {    
         //test
         float vertex_buffer[] = {
@@ -566,6 +589,11 @@ int main(int n_arg, char * args[])
             -0.5, +0.5, -0.5, //5
             -0.5, -0.5, +0.5, //6
             -0.5, -0.5, -0.5, //7
+            0.1, 0.0, 0.2,
+            0.1, 0.0, 0.3,
+            0.1, 0.1, 0.2,
+            0.4, 0.1, 0.2,
+            0.1, 0.5, 0.2,
         };
     
         uint16 index_buffer[] = {
@@ -577,7 +605,7 @@ int main(int n_arg, char * args[])
             7, 3, 5, 5, 3, 1,
         };
         //end
-
+        
         models[n_models] = createVertexAndIndexBuffer(sizeof(vertex_buffer), vertex_buffer, sizeof(index_buffer), index_buffer); //test
         id_to_index id;
         id.id = (typeof(id.id)) {'c','u','b','e',0,0,0,0,};
@@ -591,6 +619,44 @@ int main(int n_arg, char * args[])
         }
         model_index_table[current_spot] = id;
         n_models++;
+        
+        test_mesh = (mesh) {vertex_buffer, len(vertex_buffer)/3, (uint*) malloc(1000), (int*) malloc(1000), (uint*) malloc(1000), (uint*) malloc(1000), (uint*) malloc(1000), 0, (box*) malloc(1000), 0}; //mallocs are temporary
+        
+        convexHull(&test_mesh, 0, len(vertex_buffer)/3, free_memory);
+    }
+    
+    physics_object a;
+    {
+        a.mesh_id = 0;
+        a.orientation = (v4f) {0.0, 0.0, 0.0, 1.0}; //this is a quaternion
+        a.position = (v3f) {0.0, 0.0, 0.0};
+        
+        a.mass = 1.0;
+        a.inertia = (m3x3f) {
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0,
+        };
+    
+        a.angular_velocity = (v3f) {0.0, 0.0, 0.0};
+        a.velocity = (v3f) {0.0, 0.0, 0.0};
+    }
+
+    physics_object b;
+    {
+        b.mesh_id = 0;
+        b.orientation = (v4f) {sin(1.0/2)*cos(1.0/2), sin(1.0/2)*sin(1.0/2), 0.0, cos(1.0/2)}; //this is a quaternion
+        b.position = (v3f) {2.0, 0.0, 0.0};
+        
+        b.mass = 1.0;
+        b.inertia = (m3x3f) {
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0,
+        };
+    
+        b.angular_velocity = (v3f) {0.0, 0.0, 0.0};
+        b.velocity = (v3f) {0.0, 0.0, 0.0};
     }
     
     GLuint quad_vb;
@@ -607,25 +673,8 @@ int main(int n_arg, char * args[])
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_buffer), vertex_buffer, GL_STATIC_DRAW);
     }
     
-    float aspect_ratio = (float) window_width/window_height;
-    float n = 0.5;
-    float fov = pi/180.0*120.0;
-    float f = 10.0;
-    m4x4f perspective = {
-        tan(pi/2-fov*0.5), 0.0                             , 0.0        ,  0.0,
-        0.0              , (tan(pi/2-fov*0.5))*aspect_ratio, 0.0        ,  0.0,
-        0.0              , 0.0                             , n/(f-n), -1.0,
-        0.0              , 0.0                             , f*n/(f-n),  0.0,
-    };
-    
-    m4x4f camera = {
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 1.0,
-    };
-
-    camera = multiplyA(camera, perspective);
+    m4x4f camera;
+    updateCamera(&camera);
     
     for(int i = 0; i < 16; i++)
     {
@@ -666,26 +715,7 @@ int main(int n_arg, char * args[])
                             SDL_GL_GetDrawableSize(window, &window_width, &window_height);
                             wx_scale = 2.0/window_width;
                             wy_scale = 2.0/window_height;
-                            {
-                                float aspect_ratio = (float) window_width/window_height;
-                                float n = 0.5;
-                                float fov = pi/180.0*120.0;
-                                float f = 10.0;
-                                perspective = (m4x4f) {
-                                    tan(pi/2-fov*0.5), 0.0                             , 0.0        ,  0.0,
-                                    0.0              , (tan(pi/2-fov*0.5))*aspect_ratio, 0.0        ,  0.0,
-                                    0.0              , 0.0                             , n/(f-n), -1.0,
-                                    0.0              , 0.0                             , f*n/(f-n),  0.0,
-                                };
-                                camera = (m4x4f) {
-                                    1.0, 0.0, 0.0, 0.0,
-                                    0.0, 0.0, 1.0, 0.0,
-                                    0.0, 1.0, 0.0, 0.0,
-                                    0.0, 0.0, 0.0, 1.0,
-                                };
-                                
-                                camera = multiplyA(camera, perspective);
-                            }
+                            updateCamera(&camera);
                             break;
                     }
                 }
@@ -695,32 +725,46 @@ int main(int n_arg, char * args[])
             }
         }
         
-        angle0 += 0.0005;//3.1415926535897932384626433832795/4.0;
-        if(angle0 >= 2*3.1416)
-        {
-            angle0 -= 2*3.1415926535897932384626433832795;
-        }
-        float sine0 = sin(angle0);
-        float cosine0 = cos(angle0);
+        // angle0 += 0.0005;//3.1415926535897932384626433832795/4.0;
+        // if(angle0 >= 2*3.1416)
+        // {
+        //     angle0 -= 2*3.1415926535897932384626433832795;
+        // }
+        // float sine0 = sin(angle0);
+        // float cosine0 = cos(angle0);
         
-        angle1 += 0.00005;
-        if(angle1 >= 2*3.1416)
-        {
-            angle1 -= 2*3.1415926535897932384626433832795;
-        }
-        float sine1 = sin(angle1);
-        float cosine1 = cos(angle1);
+        // angle1 += 0.00005;
+        // if(angle1 >= 2*3.1416)
+        // {
+        //     angle1 -= 2*3.1415926535897932384626433832795;
+        // }
+        // float sine1 = sin(angle1);
+        // float cosine1 = cos(angle1);
         
-        for(int i = 0; i < 100; i++)
-        {
-            render_list[n_to_render].model = 0;
-            render_list[n_to_render].position = (v3f) {1.0*cos(angle0+sin(angle0)*(100-i)), -1.0*(100-i), sin(angle0+sin(angle0)*(100-i))};
-            render_list[n_to_render].orientation = (v4f) {cosine1*cosine0, sine1*cosine0, 0.0, -sine0};
-            n_to_render++;
+        // for(int i = 0; i < 100; i++)
+        // {
+        //     render_list[n_to_render].model = 0;
+        //     render_list[n_to_render].position = (v3f) {1.0*cos(angle0+sin(angle0)*(100-i)), -1.0*(100-i), sin(angle0+sin(angle0)*(100-i))};
+        //     render_list[n_to_render].orientation = (v4f) {cosine1*cosine0, sine1*cosine0, 0.0, -sine0};
+        //     n_to_render++;
 
-            render_list[n_to_render].model = 0;
-            render_list[n_to_render].position = (v3f) {-1.0*cos(angle0+sin(angle0)*(100-i)), -1.0*(100-i), -sin(angle0+sin(angle0)*(100-i))};
-            render_list[n_to_render].orientation = (v4f) {cosine1*cosine0, sine1*cosine0, 0.0, sine0};
+        //     render_list[n_to_render].model = 0;
+        //     render_list[n_to_render].position = (v3f) {-1.0*cos(angle0+sin(angle0)*(100-i)), -1.0*(100-i), -sin(angle0+sin(angle0)*(100-i))};
+        //     render_list[n_to_render].orientation = (v4f) {cosine1*cosine0, sine1*cosine0, 0.0, sine0};
+        //     n_to_render++;
+        // }
+        
+        {
+            render_list[n_to_render].model = a.mesh_id;
+            render_list[n_to_render].position = a.position;
+            render_list[n_to_render].orientation = a.orientation;
+            n_to_render++;
+        }
+        
+        {
+            render_list[n_to_render].model = b.mesh_id;
+            render_list[n_to_render].position = b.position;
+            render_list[n_to_render].orientation = b.orientation;
             n_to_render++;
         }
         
@@ -736,7 +780,7 @@ int main(int n_arg, char * args[])
         for(uint i = 0; i < n_to_render; i++)
         {
             m4x4f transform = quaternionTo4x4Matrix(render_list[i].orientation);
-
+            
             transform.rows[3] = *((v4f*) &render_list[i].position);
             transform[15] = 1.0;
             
@@ -747,7 +791,7 @@ int main(int n_arg, char * args[])
             glDrawElements(GL_TRIANGLES, models[render_list[i].model].n, GL_UNSIGNED_SHORT, 0);
         }
         n_to_render = 0;
-
+        
         glUseProgram(ui_program);
         
         glDisable(GL_DEPTH_TEST);
@@ -765,12 +809,18 @@ int main(int n_arg, char * args[])
         float x_pos = -1.0;
         if(doButtonNW("hello", x_pos, 1.0, 4, 2))
         {
-            angle0 += 0.1;
+            b.position.x -= 0.1;
+            //angle0 += 0.1;
         }
         x_pos += getTextWidthInWindowUnits("hello")+(2*4)*wx_scale;
         if(doButtonNW("goodbye", x_pos, 1.0, 4, 2))
         {
-            angle0 -= 0.1;
+            b.position.x += 0.1;
+            //angle0 -= 0.1;
+        }
+        if(isColliding(a, b, &test_mesh))
+        {
+            doButtonNW("colliding", 0.0, 0.0, 4, 2);
         }
         
         SDL_GL_SwapWindow(window);

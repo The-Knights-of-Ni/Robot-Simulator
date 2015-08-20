@@ -39,6 +39,12 @@ struct v3f
             float y;
             float z;
         };
+        struct
+        {
+            float i;
+            float j;
+            float k;
+        };
         float data[3];
     };
     
@@ -61,10 +67,10 @@ struct v4f
         };
         struct
         { //quaternion notation
-            float r;
             float i;
             float j;
             float k;
+            float r;
         };
         float data[4];
     };
@@ -196,6 +202,20 @@ v3f multiply(m3x3f m, v3f v)
     return product;
 }
 
+v3f multiply(v3f v, m3x3f m)
+{
+    v3f product;
+    for(int c = 0; c < 3; c++)
+    {
+        product[c] = 0;
+        for(int i = 0; i < 3; i++)
+        {
+            product[c] += m[c+i*3]*v[i];
+        }
+    }
+    return product;
+}
+
 inline v4f inverseQuaternion(v4f q)
 {
     q.r = -q.r;
@@ -207,7 +227,7 @@ inline m3x3f quaternionToMatrix(v4f q)
     m3x3f matrix = {
         1-2*sq(q.j)-2*sq(q.k), 2*(q.i*q.j-q.k*q.r)  , 2*(q.i*q.k+q.j*q.r)  ,
         2*(q.i*q.j+q.k*q.r)  , 1-2*sq(q.i)-2*sq(q.k), 2*(q.j*q.k-q.i*q.r)  ,
-        2*(q.i*q.k+q.j*q.r)  , 2*(q.j*q.k+q.i*q.r)  , 1-2*sq(q.i)-2*sq(q.j),
+        2*(q.i*q.k-q.j*q.r)  , 2*(q.j*q.k+q.i*q.r)  , 1-2*sq(q.i)-2*sq(q.j),
     };
     return matrix;
 }
@@ -217,16 +237,51 @@ inline m4x4f quaternionTo4x4Matrix(v4f q)
     m4x4f matrix = {
         1-2*sq(q.j)-2*sq(q.k), 2*(q.i*q.j-q.k*q.r)  , 2*(q.i*q.k+q.j*q.r)  , 0.0,
         2*(q.i*q.j+q.k*q.r)  , 1-2*sq(q.i)-2*sq(q.k), 2*(q.j*q.k-q.i*q.r)  , 0.0,
-        2*(q.i*q.k+q.j*q.r)  , 2*(q.j*q.k+q.i*q.r)  , 1-2*sq(q.i)-2*sq(q.j), 0.0,
+        2*(q.i*q.k-q.j*q.r)  , 2*(q.j*q.k+q.i*q.r)  , 1-2*sq(q.i)-2*sq(q.j), 0.0,
         0.0                  , 0.0                  , 0.0                  , 1.0,
     };
     return matrix;
 }
 
+v4f quaternionMultiply(v4f a, v4f b)
+{
+    v4f product = {
+        a.r*b.i+a.i*b.r+a.j*b.k-a.k*b.j,
+        a.r*b.j-a.i*b.k+a.j*b.r+a.k*b.i,
+        a.r*b.k+a.i*b.j-a.j*b.i-a.k*b.r,
+        a.r*b.r-a.i*b.i-a.j*b.j-a.k*b.k,
+    };
+    
+    return product;
+}
+
+v4f quaternionMultiply(v4f a, v3f b)
+{
+    v4f product = {
+        a.r*b.i+a.j*b.k-a.k*b.j,
+        a.r*b.j-a.i*b.k+a.k*b.i,
+        a.r*b.k+a.i*b.j-a.j*b.i,
+        -a.i*b.i-a.j*b.j-a.k*b.k,
+    };
+    
+    return product;
+}
+
 inline v3f applyQuaternion(v4f q, v3f p)
 {
-    return multiply(quaternionToMatrix(q), p);
+    return multiply(p, quaternionToMatrix(q));
 }
+
+/* inline v3f applyQuaternion(v4f q, v3f p) */
+/* { */
+/*     union */
+/*     { */
+/*         v4f product; */
+/*         v3f out; */
+/*     }; */
+/*     product = quaternionMultiply(quaternionMultiply(q, p), inverseQuaternion(q)); */
+/*     return out; */
+/* } */
 
 //matrix multiplication of aligned matrices a and b
 inline m4x4f multiplyA( m4x4f a, m4x4f b)
