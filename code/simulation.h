@@ -55,6 +55,8 @@ struct physics_object
 /*     graph[v0].edges[graph[v0].n_edges++] = v1; */
 /* } */
 
+#define epsilon 0.005
+
 struct support_return
 {
     v3f point;
@@ -91,8 +93,8 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
         v3f norm1 = cross(sub(simplex[0], simplex[2]), axis);
         v3f to_origin = negative(simplex[2]);
         
-        if(dot(norm0, dir) < 0) norm0 = negative(norm0);
-        if(dot(norm1, dir) < 0) norm1 = negative(norm1);
+        /* if(dot(norm0, dir) < 0) norm0 = negative(norm0); */
+        /* if(dot(norm1, dir) < 0) norm1 = negative(norm1); */
         
         if(dot(norm0, to_origin) < 0)
         {
@@ -133,9 +135,9 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
         v3f norm2 = cross(sub(simplex[2], simplex[3]), sub(simplex[0], simplex[3]));
         v3f to_origin = negative(simplex[3]);
         
-        if(dot(norm0, dir) < 0) norm0 = negative(norm0);
-        if(dot(norm1, dir) < 0) norm1 = negative(norm1);
-        if(dot(norm2, dir) < 0) norm2 = negative(norm2);
+        if(dot(norm0, sub(simplex[3], simplex[2])) < 0) norm0 = negative(norm0);
+        if(dot(norm1, sub(simplex[3], simplex[0])) < 0) norm1 = negative(norm1);
+        if(dot(norm2, sub(simplex[3], simplex[1])) < 0) norm2 = negative(norm2);
         
         if(dot(norm0, to_origin) < 0)
         {
@@ -188,6 +190,11 @@ bool8 doSimplex(v3f * simplex, int & n_simplex_points, v3f & dir)
         }
         else
         {
+            printf("\n");
+            printf("(%f, %f, %f)\n", simplex[0].x, simplex[0].y, simplex[0].z);
+            printf("(%f, %f, %f)\n", simplex[1].x, simplex[1].y, simplex[1].z);
+            printf("(%f, %f, %f)\n", simplex[2].x, simplex[2].y, simplex[2].z);
+            printf("(%f, %f, %f)\n", simplex[3].x, simplex[3].y, simplex[3].z);
             assert(0 && "origin is past the new simplex point");
         }
     }
@@ -217,7 +224,11 @@ void addOneWayEdgeToLinkedLists(uint * first_neighbor_links, convex_neighbors_li
     {
         uint current_link = first_neighbor_links[v1];
         for(; neighbors[current_link].next_link != 0;
-            current_link = neighbors[current_link].next_link);
+            current_link = neighbors[current_link].next_link)
+        {
+            //TODO: If the edge exist one way it also exist the other way, this is redundent the second time
+            if(neighbors[current_link].neighbor == v2) return;
+        }
         neighbors[current_link].next_link = n_neighbor_links;
     }
     neighbors[n_neighbor_links].next_link = 0;
@@ -360,9 +371,11 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
         
         uint left_edge = ranges[n_ranges].left_edge;
         uint right_edge = ranges[n_ranges].right_edge;
+        printf("left_edge = %d, right_edge = %d\n", left_edge, right_edge);
         
         uint middle_vert = (left_edge+right_edge)/2; //TODO: loop over the sub-endpoints from a stack
-    
+
+        printf("middle_vert = %d\n", middle_vert);
         uint left_bridge_vert = middle_vert-1;
         uint right_bridge_vert = middle_vert;
         
@@ -424,7 +437,7 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
         }
     stop_searching_for_bridge:;
         
-        printf("%d, %d\n", left_bridge_vert, right_bridge_vert);
+        printf("bridge verts %d, %d\n", left_bridge_vert, right_bridge_vert);
         
         addEdgeToLinkedLists(first_neighbor_links, neighbors, n_neighbor_links, left_bridge_vert, right_bridge_vert);
         
@@ -450,11 +463,13 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
         for ever
         {
             float highest_dot = -1.1;
-            for(int i = 0; i < n_hull_verts; i++)
+            for(int i = left_edge; i < right_edge; i++)
             {
                 if(i == last_left_vert || i == last_right_vert) continue;
                 float current_dot = dot(ccw_direction,
-                                        normalize(sub(m->verts[hull_indecies[i]], m->verts[hull_indecies[last_right_vert]])));
+                                        normalize(rejection(
+                                                      sub(m->verts[hull_indecies[i]], m->verts[hull_indecies[last_right_vert]]),
+                                                      current_axis)));
                 
                 if(current_dot > highest_dot)
                 {
@@ -486,8 +501,8 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
                     outmost_left_vert  = next_vert;
                 
                 printf("lefty %d\n", next_vert);
-                v3f new_axis = normalize(sub(m->verts[hull_indecies[next_vert]], m->verts[hull_indecies[last_right_vert]]));
-                ccw_direction = normalize(rejection(current_axis, new_axis));
+                v3f new_axis = normalize(sub(m->verts[hull_indecies[last_right_vert]], m->verts[hull_indecies[next_vert]]));
+                ccw_direction = cross(cross(new_axis, current_axis), new_axis);//normalize(rejection(negative(current_axis), new_axis));
                 current_axis = new_axis;
                 
                 last_left_vert = next_vert;
@@ -501,24 +516,30 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
                 
                 printf("righty %d\n", next_vert);
                 v3f new_axis = normalize(sub(m->verts[hull_indecies[next_vert]], m->verts[hull_indecies[last_left_vert]]));
-                ccw_direction = normalize(rejection(current_axis, new_axis));
+                ccw_direction = cross(cross(current_axis, new_axis), new_axis);//normalize(rejection(current_axis, new_axis));
                 current_axis = new_axis;
                 
                 last_right_vert = next_vert;
             }
         }
         temp_free_memory = (void *)((v3f *) temp_free_memory + n_connection_points);
-
+        
         printf("here\n");
         //delete points that cannot contribute to the convex hull
         printf("%d, %d\n", inmost_left_vert, inmost_right_vert);
         int left_kill = inmost_left_vert;
-        while(m->coords[3*hull_indecies[++left_kill]] == m->coords[3*hull_indecies[inmost_left_vert]] && left_kill < middle_vert);
+        while(left_kill < inmost_right_vert)
+        {
+            if(m->coords[3*hull_indecies[++left_kill]] > m->coords[3*hull_indecies[inmost_left_vert]]) break;
+        }
         
-        int right_kill = inmost_right_vert;
-        while(m->coords[3*hull_indecies[--right_kill]] == m->coords[3*hull_indecies[inmost_right_vert]] && right_kill >= middle_vert);
+        int right_kill = inmost_right_vert+1;
+        while(--right_kill > left_kill)//inmost_left_vert)
+        {
+            if(m->coords[3*hull_indecies[right_kill-1]] < m->coords[3*hull_indecies[inmost_right_vert]]) break;
+        }
         
-        uint n_useless_verts = right_kill-left_kill;
+        int n_useless_verts = right_kill-left_kill;
         printf("there\n");
         printf("%d, %d, %d\n", left_kill, right_kill, n_useless_verts);
 
@@ -528,19 +549,21 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
             { //TODO: this is simdizable
                 hull_indecies[i] = hull_indecies[i+n_useless_verts];
             }
+            outmost_right_vert -= n_useless_verts;
+            right_edge -= n_useless_verts;
+            n_hull_verts -= n_useless_verts;
         }
-        outmost_right_vert -= n_useless_verts;
-        right_edge -= n_useless_verts;
-        n_hull_verts -= n_useless_verts;
         
         uint * keep_list = (uint *) temp_free_memory;
         uint n_to_keep = 0;
+        printf("outmost verts: %d, %d\n", outmost_left_vert, outmost_right_vert);
         for(uint i = outmost_left_vert+1; i < outmost_right_vert; i++)
         { //GJK to test if each point is contained in the tunnel
             v3f simplex[4];
             simplex[0] = sub(connection_points[0], m->verts[hull_indecies[i]]);
             int n_simplex_points = 1;
             v3f dir = negative(simplex[0]);
+            if(dot(dir, dir) <= epsilon) goto keep;
             
             support_return second_support;
             
@@ -557,20 +580,27 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
             if(second_support.distance < 0) continue;
             simplex[n_simplex_points++] = second_support.point;
             dir = rejection(negative(simplex[0]), sub(simplex[0], simplex[1]));
+            if(dot(dir, dir) <= epsilon) goto keep;
             
             printf("s0 %f, %f, %f\n", simplex[0].x, simplex[0].y, simplex[0].z);
             printf("s1 %f, %f, %f\n", simplex[1].x, simplex[1].y, simplex[1].z);
-            for ever
+
+            #define max_itterations 1000
+            for(int i = 0;;i++)
             {
+                if(i >= max_itterations) goto dont_keep;
+                //if this many itterations is reached, the point is probably near a face and won't contribute much to the hull
+                
                 support_return new_support = convexHullSupport(connection_points, n_connection_points, m->verts[hull_indecies[i]], dir);
                 if(new_support.distance < 0) break;
                 simplex[n_simplex_points++] = new_support.point;
                 
                 printf("ns %f, %f, %f\n", new_support.point.x, new_support.point.y, new_support.point.z);
-                
-                if(doSimplex(simplex, n_simplex_points, dir))
+
+                if(doSimplex(simplex, n_simplex_points, dir) ||
+                   dot(dir, dir) <= epsilon)
                 { //intersection found
-                    printf("get out, point!\n");
+                    printf("get out point!\n");
                     goto dont_keep;
                 }
             }
@@ -602,11 +632,19 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
             ranges[n_ranges].right_edge = middle_edge;
             n_ranges++;
         }
-        if(right_edge-middle_edge > 4)
+        else
+        {
+            //TODO: connect all 4
+        }
+        if(right_edge-middle_edge > 4) //NOTE: it's important that the right-most range is on the top of the stack, since points to the left of the stack may be shuffled durring point deletion
         {
             ranges[n_ranges].left_edge = middle_edge;
             ranges[n_ranges].right_edge = right_edge;
             n_ranges++;
+        }
+        else
+        {
+            //TODO: connect all 4
         }
     }
     
@@ -637,7 +675,6 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
     {
         printf("%d, (%f, %f, %f)\n", hull_indecies[i], m->verts[hull_indecies[i]].x, m->verts[hull_indecies[i]].y, m->verts[hull_indecies[i]].z);
     }
-    
 }
 
 //TODO: use neighbor data to speed up search
@@ -684,7 +721,6 @@ inline support_return support(physics_object a, int a_group, physics_object b, i
 }
 
 //TODO: generate contact points
-#define epsilon 0.005
 inline bool isColliding(physics_object a, physics_object b, mesh * mesh_list)
 {
     mesh & a_mesh = mesh_list[a.mesh_id];

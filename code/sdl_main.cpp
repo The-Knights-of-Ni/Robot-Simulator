@@ -269,6 +269,28 @@ bool doButtonNW(char * string, float x0, float y1, float x_padding, float y_padd
     return over && !left_click && prev_left_click;
 }
 
+void updateCameraTemp(m4x4f * camera, float theta)
+{
+    float aspect_ratio = (float) window_width/window_height;
+    float n = 1.5;
+    float fov = pi/180.0*120.0;
+    float f = 2.0;
+    m4x4f perspective = (m4x4f) {
+        tan(pi/2-fov*0.5), 0.0                             , 0.0        ,  0.0,
+        0.0              , (tan(pi/2-fov*0.5))*aspect_ratio, 0.0        ,  0.0,
+        0.0              , 0.0                             , n/(f-n), -1.0,
+        0.0              , 0.0                             , f*n/(f-n),  0.0,
+    };
+    *camera = (m4x4f) {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, sin(theta), cos(theta), 0.0,
+        0.0, cos(theta), sin(-theta), 0.0,
+        0.0, 0.0, -3.0, 1.0,
+    };
+    
+    *camera = multiplyA(*camera, perspective);
+}
+
 void updateCamera(m4x4f * camera)
 {
     float aspect_ratio = (float) window_width/window_height;
@@ -589,11 +611,19 @@ int main(int n_arg, char * args[])
             -0.5, +0.5, -0.5, //5
             -0.5, -0.5, +0.5, //6
             -0.5, -0.5, -0.5, //7
-            0.1, 0.0, 0.2,
-            0.1, 0.0, 0.3,
-            0.1, 0.1, 0.2,
-            0.4, 0.1, 0.2,
-            0.1, 0.5, 0.2,
+            
+            +1.5, +0.25, +0.25, //0
+            +1.5, +0.25, -0.25, //1
+            +1.5, -0.25, +0.25, //2
+            +1.5, -0.25, -0.25, //3
+            -1.5, +0.25, +0.25, //4
+            -1.5, +0.25, -0.25, //5
+            -1.5, -0.25, +0.25, //6
+            -1.5, -0.25, -0.25, //7
+            
+            -0.0, -0.1, -0.2,
+            -0.1, 0.4, -0.3,
+            -0.2, 0.3, 0.2,
         };
     
         uint16 index_buffer[] = {
@@ -603,6 +633,20 @@ int main(int n_arg, char * args[])
             7, 5, 6, 6, 5, 4,
             7, 6, 3, 6, 2, 3,
             7, 3, 5, 5, 3, 1,
+            
+            4, 5, 6, 5, 7, 6,
+            4, 12, 5, 5, 12, 13,
+            4, 6, 12, 6, 14, 12,
+            15, 13, 14, 14, 13, 12,
+            15, 14, 7, 14, 6, 7,
+            15, 7, 13, 13, 7, 5,
+            
+            8, 9, 10, 9, 11, 10,
+            8, 0, 9, 9, 0, 1,
+            8, 10, 0, 10, 2, 0,
+            3, 1, 2, 2, 1, 0,
+            3, 2, 11, 2, 10, 11,
+            3, 11, 1, 1, 11, 9,
         };
         //end
         
@@ -725,13 +769,13 @@ int main(int n_arg, char * args[])
             }
         }
         
-        // angle0 += 0.0005;//3.1415926535897932384626433832795/4.0;
-        // if(angle0 >= 2*3.1416)
-        // {
-        //     angle0 -= 2*3.1415926535897932384626433832795;
-        // }
-        // float sine0 = sin(angle0);
-        // float cosine0 = cos(angle0);
+        angle0 += 0.0005;//3.1415926535897932384626433832795/4.0;
+        if(angle0 >= 2*3.1416)
+        {
+            angle0 -= 2*3.1415926535897932384626433832795;
+        }
+        float sine0 = sin(angle0);
+        float cosine0 = cos(angle0);
         
         // angle1 += 0.00005;
         // if(angle1 >= 2*3.1416)
@@ -777,13 +821,15 @@ int main(int n_arg, char * args[])
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); //wireframe
         
+        updateCameraTemp(&camera, angle0);
+        
         for(uint i = 0; i < n_to_render; i++)
         {
             m4x4f transform = quaternionTo4x4Matrix(render_list[i].orientation);
             
             transform.rows[3] = *((v4f*) &render_list[i].position);
             transform[15] = 1.0;
-            
+                        
             transform = multiplyA(transform, camera);
             
             glUniformMatrix4fv(transform_uniform, 1, 1, (GLfloat *) &transform);
@@ -809,15 +855,17 @@ int main(int n_arg, char * args[])
         float x_pos = -1.0;
         if(doButtonNW("hello", x_pos, 1.0, 4, 2))
         {
-            b.position.x -= 0.1;
+            b.velocity.x -= 0.0001;
             //angle0 += 0.1;
         }
         x_pos += getTextWidthInWindowUnits("hello")+(2*4)*wx_scale;
         if(doButtonNW("goodbye", x_pos, 1.0, 4, 2))
         {
-            b.position.x += 0.1;
+            b.velocity.x += 0.0001;
             //angle0 -= 0.1;
         }
+        if(abs(b.position.x) > 10) b.velocity.x = 0, b.position.x = b.position.x > 0 ? 10: -10;
+        b.position.x += b.velocity.x;
         if(isColliding(a, b, &test_mesh))
         {
             doButtonNW("colliding", 0.0, 0.0, 4, 2);
