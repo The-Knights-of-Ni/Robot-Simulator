@@ -606,7 +606,7 @@ int main(int n_arg, char * args[])
     vi_buffer debug_convex_verts;//DEBUG
     {    
         //test
-        float vertex_buffer[3*(18)] = {
+        float vertex_buffer[3*(8)] = {
             +0.5, +0.5, +0.5, //0
             +0.5, +0.5, -0.5, //1
             +0.5, -0.5, +0.5, //2
@@ -637,14 +637,14 @@ int main(int n_arg, char * args[])
             // -1.3, 0.2, 0.2,
         };
         
-        uint seed = 5206;
-        for(int i = 3*8; i < len(vertex_buffer); i++)
-        {
-            vertex_buffer[i] = randf(&seed)*2.0-1.0;
-            if(i%3 == 0) printf("\n");
-            printf("%f, ", vertex_buffer[i]);
-        }
-        printf("\n");
+        // uint seed = 5206;
+        // for(int i = 3*8; i < len(vertex_buffer); i++)
+        // {
+        //     vertex_buffer[i] = randf(&seed)*2.0-1.0;
+        //     if(i%3 == 0) printf("\n");
+        //     printf("%f, ", vertex_buffer[i]);
+        // }
+        // printf("\n");
     
         uint16 index_buffer[] = {
             0, 1, 2, 1, 3, 2,
@@ -710,14 +710,14 @@ int main(int n_arg, char * args[])
         {//DEBUG
             uint16 verts[1000];
             uint n_verts = 0;
-            // for(uint v = test_mesh.convex_starts[0]; v < test_mesh.convex_starts[0+1]; v++)
-            // {
-            //     verts[n_verts++] = test_mesh.convex_indecies[v];
-            // }
-            for(uint v = 0; v < len(vertex_buffer)/3; v++)
+            for(uint v = test_mesh.convex_starts[0]; v < test_mesh.convex_starts[0+1]; v++)
             {
-                verts[n_verts++] = v;
+                verts[n_verts++] = test_mesh.convex_indecies[v];
             }
+            // for(uint v = 0; v < len(vertex_buffer)/3; v++)
+            // {
+            //     verts[n_verts++] = v;
+            // }
             
             debug_convex_verts = createVertexAndIndexBuffer(sizeof(vertex_buffer), vertex_buffer, n_verts*sizeof(verts[0]), verts);
         }
