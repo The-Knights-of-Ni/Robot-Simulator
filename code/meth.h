@@ -382,4 +382,19 @@ inline float mod(float x, float base)
     return x-floor(x/base)*base;
 }
 
+
+float32 randf(uint32 * seed)
+{
+    union
+    {
+        uint32 iout;
+        float32 fout;
+    };
+    
+    *seed *= 16807;
+
+    iout = ((*seed) >> 9) | 0x3F800000;
+    
+    return fout - 1.0;
+}
 #endif

@@ -355,7 +355,7 @@ int main(int n_arg, char * args[])
     //glEnable(GL_DEBUG_OUTPUT);
     #endif
     
-    void * memory = (byte *) malloc(1*gigabyte);
+    void * memory = (byte *) malloc(0.5*gigabyte);
     void * free_memory = memory;
     
     //font stuff
@@ -471,6 +471,7 @@ int main(int n_arg, char * args[])
     
     GLuint program;
     GLuint transform_uniform;
+    GLuint shader_mode;
     {
         void * temp_memory = free_memory;
         char * vertex_shader_source = (char *) temp_memory;
@@ -502,6 +503,7 @@ int main(int n_arg, char * args[])
         }
         
         transform_uniform = glGetUniformLocation(program, "t");
+        shader_mode = glGetUniformLocation(program, "mode");
         
         glDetachShader(program, vertex_shader);
         glDetachShader(program, fragment_shader);
@@ -600,9 +602,11 @@ int main(int n_arg, char * args[])
     
     //add model to list and index table
     mesh test_mesh;
+    vi_buffer debug_convex_edges;//DEBUG
+    vi_buffer debug_convex_verts;//DEBUG
     {    
         //test
-        float vertex_buffer[] = {
+        float vertex_buffer[3*(18)] = {
             +0.5, +0.5, +0.5, //0
             +0.5, +0.5, -0.5, //1
             +0.5, -0.5, +0.5, //2
@@ -612,19 +616,35 @@ int main(int n_arg, char * args[])
             -0.5, -0.5, +0.5, //6
             -0.5, -0.5, -0.5, //7
             
-            +1.5, +0.25, +0.25, //0
-            +1.5, +0.25, -0.25, //1
-            +1.5, -0.25, +0.25, //2
-            +1.5, -0.25, -0.25, //3
-            -1.5, +0.25, +0.25, //4
-            -1.5, +0.25, -0.25, //5
-            -1.5, -0.25, +0.25, //6
-            -1.5, -0.25, -0.25, //7
+            // +1.5, +0.25, +0.25, //0
+            // +1.5, +0.25, -0.25, //1
+            // +1.5, -0.25, +0.25, //2
+            // +1.5, -0.25, -0.25, //3
+            // -1.5, +0.25, +0.25, //4
+            // -1.5, +0.25, -0.25, //5
+            // -1.5, -0.25, +0.25, //6
+            // -1.5, -0.25, -0.25, //7
+            //TODO: fix the case where ^ is removed but \/ is not, related to the 1.3, 0.0, 0.0 point
             
-            -0.0, -0.1, -0.2,
-            -0.1, 0.4, -0.3,
-            -0.2, 0.3, 0.2,
+            // -0.0, -0.1, -0.2,
+            // -0.1, 0.4, -0.3,
+            // -0.2, 0.3, 0.2,
+            // 1.3, 0.2, 0.2,
+            // 1.3, -0.2, 0.2,
+            // 1.3, 0.2, -0.2,
+            // 1.3, -0.2, -0.2,
+            // 1.3, 0.0, 0.0,
+            // -1.3, 0.2, 0.2,
         };
+        
+        uint seed = 5206;
+        for(int i = 3*8; i < len(vertex_buffer); i++)
+        {
+            vertex_buffer[i] = randf(&seed)*2.0-1.0;
+            if(i%3 == 0) printf("\n");
+            printf("%f, ", vertex_buffer[i]);
+        }
+        printf("\n");
     
         uint16 index_buffer[] = {
             0, 1, 2, 1, 3, 2,
@@ -664,9 +684,44 @@ int main(int n_arg, char * args[])
         model_index_table[current_spot] = id;
         n_models++;
         
-        test_mesh = (mesh) {vertex_buffer, len(vertex_buffer)/3, (uint*) malloc(1000), (int*) malloc(1000), (uint*) malloc(1000), (uint*) malloc(1000), (uint*) malloc(1000), 0, (box*) malloc(1000), 0}; //mallocs are temporary
+        test_mesh = (mesh) {vertex_buffer, len(vertex_buffer)/3, (uint*) malloc(1000), (int*) malloc(1000), (uint*) malloc(1000), (uint*) malloc(1000), (uint*) malloc(1000), 0, (box*) malloc(1000), 0}; //TODO: mallocs are temporary
         
         convexHull(&test_mesh, 0, len(vertex_buffer)/3, free_memory);
+        
+        //NOTE: WAS HERE; TODO: draw covex hull faces
+        {//DEBUG
+            uint16 edges[1000];
+            uint n_edges = 0;
+            for(uint i = 0; i < test_mesh.convex_starts[0+1]-test_mesh.convex_starts[0]; i++)
+            {
+                //printf("i: %d, n: %d\n", i, test_mesh.n_convex_neighbors[i]);
+                for(uint n = 0; n < test_mesh.n_convex_neighbors[i]; n++)
+                {
+                    edges[n_edges++] = test_mesh.convex_indecies[test_mesh.convex_neighbors[test_mesh.convex_neighbors_starts[i]+n]];
+                    edges[n_edges++] = test_mesh.convex_indecies[i];
+                    //edges[n_edges++] = test_mesh.convex_indecies[test_mesh.convex_neighbors[i]];
+                    //edges[n_edges++] = test_mesh.convex_indecies[test_mesh.convex_neighbors[n]];
+                }
+            }
+            
+            debug_convex_edges = createVertexAndIndexBuffer(sizeof(vertex_buffer), vertex_buffer, n_edges*sizeof(edges[0]), edges);
+        }
+
+        {//DEBUG
+            uint16 verts[1000];
+            uint n_verts = 0;
+            // for(uint v = test_mesh.convex_starts[0]; v < test_mesh.convex_starts[0+1]; v++)
+            // {
+            //     verts[n_verts++] = test_mesh.convex_indecies[v];
+            // }
+            for(uint v = 0; v < len(vertex_buffer)/3; v++)
+            {
+                verts[n_verts++] = v;
+            }
+            
+            debug_convex_verts = createVertexAndIndexBuffer(sizeof(vertex_buffer), vertex_buffer, n_verts*sizeof(verts[0]), verts);
+        }
+        
     }
     
     physics_object a;
@@ -689,7 +744,7 @@ int main(int n_arg, char * args[])
     physics_object b;
     {
         b.mesh_id = 0;
-        b.orientation = (v4f) {sin(1.0/2)*cos(1.0/2), sin(1.0/2)*sin(1.0/2), 0.0, cos(1.0/2)}; //this is a quaternion
+        b.orientation = (v4f) {sin(pi/2)*cos(1.0/4), sin(pi/2)*sin(1.0/4), 0.0, cos(pi/2)}; //this is a quaternion
         b.position = (v3f) {2.0, 0.0, 0.0};
         
         b.mass = 1.0;
@@ -829,13 +884,52 @@ int main(int n_arg, char * args[])
             
             transform.rows[3] = *((v4f*) &render_list[i].position);
             transform[15] = 1.0;
-                        
+            
             transform = multiplyA(transform, camera);
+            
+            glUniform1i(shader_mode, 0);
             
             glUniformMatrix4fv(transform_uniform, 1, 1, (GLfloat *) &transform);
             bindVertexAndIndexBuffers(models[render_list[i].model].vb, models[render_list[i].model].ib);
             glDrawElements(GL_TRIANGLES, models[render_list[i].model].n, GL_UNSIGNED_SHORT, 0);
         }
+        
+        for(uint i = 0; i < n_to_render; i++)//TEMP
+        {
+            m4x4f transform = quaternionTo4x4Matrix(render_list[i].orientation);
+            
+            transform.rows[3] = *((v4f*) &render_list[i].position);
+            transform[15] = 1.0;
+            
+            transform = multiplyA(transform, camera);
+
+            glUniform1i(shader_mode, 1);
+
+            glDisable(GL_DEPTH_TEST);
+            glUniformMatrix4fv(transform_uniform, 1, 1, (GLfloat *) &transform);
+            bindVertexAndIndexBuffers(debug_convex_edges.vb, debug_convex_edges.ib);
+            glDrawElements(GL_LINES, debug_convex_edges.n, GL_UNSIGNED_SHORT, 0);
+            glEnable(GL_DEPTH_TEST);
+        }
+        
+        for(uint i = 0; i < n_to_render; i++)//TEMP
+        {
+            m4x4f transform = quaternionTo4x4Matrix(render_list[i].orientation);
+            
+            transform.rows[3] = *((v4f*) &render_list[i].position);
+            transform[15] = 1.0;
+            
+            transform = multiplyA(transform, camera);
+
+            glUniform1i(shader_mode, 1);
+
+            glDisable(GL_DEPTH_TEST);
+            glUniformMatrix4fv(transform_uniform, 1, 1, (GLfloat *) &transform);
+            bindVertexAndIndexBuffers(debug_convex_verts.vb, debug_convex_verts.ib);
+            glDrawElements(GL_POINTS, debug_convex_verts.n, GL_UNSIGNED_SHORT, 0);
+            glEnable(GL_DEPTH_TEST);
+        }
+
         n_to_render = 0;
         
         glUseProgram(ui_program);
@@ -864,11 +958,15 @@ int main(int n_arg, char * args[])
             b.velocity.x += 0.0001;
             //angle0 -= 0.1;
         }
-        if(abs(b.position.x) > 10) b.velocity.x = 0, b.position.x = b.position.x > 0 ? 10: -10;
+        //if(abs(b.position.x) > 10) b.velocity.x = 0, b.position.x = b.position.x > 0 ? 10: -10;
         b.position.x += b.velocity.x;
         if(isColliding(a, b, &test_mesh))
         {
             doButtonNW("colliding", 0.0, 0.0, 4, 2);
+        }
+        else
+        {
+            b.velocity.x = 0, b.position.x -= b.position.x > 0 ? 0.001: -0.001;
         }
         
         SDL_GL_SwapWindow(window);

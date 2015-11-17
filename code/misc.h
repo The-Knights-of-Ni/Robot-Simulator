@@ -32,7 +32,7 @@ typedef double float64;
 #endif
 
 #ifdef DEBUG
-#define assert(this_is_true) if(!(this_is_true)) {printf("failed assertion: %s", #this_is_true); crash;}
+#define assert(this_is_true) if(!(this_is_true)) {printf("failed assertion: %s", #this_is_true); exit(EXIT_SUCCESS);}
 #else
 #define assert(this_is_true)
 #endif
