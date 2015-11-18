@@ -168,6 +168,7 @@ inline float32 invsqrt(float32 a)
     };
     isqrti = 0x5f375a86 - (ai >> 1); //magic meth
     isqrt *= (1.5f - (a*0.5f*isqrt*isqrt));
+    //isqrt *= (1.5f - (a*0.5f*isqrt*isqrt)); //second itteration
     return isqrt;
 }
 

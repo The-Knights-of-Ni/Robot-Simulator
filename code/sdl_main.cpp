@@ -355,7 +355,7 @@ int main(int n_arg, char * args[])
     //glEnable(GL_DEBUG_OUTPUT);
     #endif
     
-    void * memory = (byte *) malloc(0.5*gigabyte);
+    void * memory = (byte *) malloc(1.0*gigabyte);
     void * free_memory = memory;
     
     //font stuff
@@ -477,7 +477,7 @@ int main(int n_arg, char * args[])
         char * vertex_shader_source = (char *) temp_memory;
         readTextFile(vertex_shader_source, "shader.vert");
         GLuint vertex_shader = initShader(vertex_shader_source, GL_VERTEX_SHADER);
-
+        
         char * fragment_shader_source = (char *) temp_memory;
         int fragment_shader_source_size = readTextFile(vertex_shader_source, "shader.frag");
         temp_memory = (void *) ((char *) fragment_shader_source_size);
@@ -606,7 +606,7 @@ int main(int n_arg, char * args[])
     vi_buffer debug_convex_verts;//DEBUG
     {    
         //test
-        float vertex_buffer[3*(8)] = {
+        float vertex_buffer[] = {
             +0.5, +0.5, +0.5, //0
             +0.5, +0.5, -0.5, //1
             +0.5, -0.5, +0.5, //2
@@ -616,17 +616,16 @@ int main(int n_arg, char * args[])
             -0.5, -0.5, +0.5, //6
             -0.5, -0.5, -0.5, //7
             
-            // +1.5, +0.25, +0.25, //0
-            // +1.5, +0.25, -0.25, //1
-            // +1.5, -0.25, +0.25, //2
-            // +1.5, -0.25, -0.25, //3
-            // -1.5, +0.25, +0.25, //4
-            // -1.5, +0.25, -0.25, //5
-            // -1.5, -0.25, +0.25, //6
-            // -1.5, -0.25, -0.25, //7
-            //TODO: fix the case where ^ is removed but \/ is not, related to the 1.3, 0.0, 0.0 point
+            +1.5, +0.25, +0.25, //0
+            +1.5, +0.25, -0.25, //1
+            +1.5, -0.25, +0.25, //2
+            +1.5, -0.25, -0.25, //3
+            -1.5, +0.25, +0.25, //4
+            -1.5, +0.25, -0.25, //5
+            -1.5, -0.25, +0.25, //6
+            -1.5, -0.25, -0.25, //7
             
-            // -0.0, -0.1, -0.2,
+            //  -0.0, -0.1, -0.2,
             // -0.1, 0.4, -0.3,
             // -0.2, 0.3, 0.2,
             // 1.3, 0.2, 0.2,
@@ -638,7 +637,7 @@ int main(int n_arg, char * args[])
         };
         
         // uint seed = 5206;
-        // for(int i = 3*8; i < len(vertex_buffer); i++)
+        // for(int i = 0; i < len(vertex_buffer); i++)
         // {
         //     vertex_buffer[i] = randf(&seed)*2.0-1.0;
         //     if(i%3 == 0) printf("\n");
@@ -912,23 +911,23 @@ int main(int n_arg, char * args[])
             glEnable(GL_DEPTH_TEST);
         }
         
-        for(uint i = 0; i < n_to_render; i++)//TEMP
-        {
-            m4x4f transform = quaternionTo4x4Matrix(render_list[i].orientation);
+        // for(uint i = 0; i < n_to_render; i++)//TEMP
+        // {
+        //     m4x4f transform = quaternionTo4x4Matrix(render_list[i].orientation);
             
-            transform.rows[3] = *((v4f*) &render_list[i].position);
-            transform[15] = 1.0;
+        //     transform.rows[3] = *((v4f*) &render_list[i].position);
+        //     transform[15] = 1.0;
             
-            transform = multiplyA(transform, camera);
+        //     transform = multiplyA(transform, camera);
 
-            glUniform1i(shader_mode, 1);
+        //     glUniform1i(shader_mode, 1);
 
-            glDisable(GL_DEPTH_TEST);
-            glUniformMatrix4fv(transform_uniform, 1, 1, (GLfloat *) &transform);
-            bindVertexAndIndexBuffers(debug_convex_verts.vb, debug_convex_verts.ib);
-            glDrawElements(GL_POINTS, debug_convex_verts.n, GL_UNSIGNED_SHORT, 0);
-            glEnable(GL_DEPTH_TEST);
-        }
+        //     glDisable(GL_DEPTH_TEST);
+        //     glUniformMatrix4fv(transform_uniform, 1, 1, (GLfloat *) &transform);
+        //     bindVertexAndIndexBuffers(debug_convex_verts.vb, debug_convex_verts.ib);
+        //     glDrawElements(GL_POINTS, debug_convex_verts.n, GL_UNSIGNED_SHORT, 0);
+        //     glEnable(GL_DEPTH_TEST);
+        // }
 
         n_to_render = 0;
         

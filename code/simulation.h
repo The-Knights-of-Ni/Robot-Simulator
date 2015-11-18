@@ -150,7 +150,6 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
     if(m->n_convex_groups == 0) m->convex_starts[m->n_convex_groups] = 0;
     
     uint * hull_indecies = m->convex_indecies + m->convex_starts[m->n_convex_groups];
-    free_memory = (void *)((byte *) free_memory + sizeof(uint)*n_hull_verts);
     uint * sorted_indecies = (uint *) ((char *) free_memory);
     free_memory = (void *)((byte *) free_memory + sizeof(uint)*n_hull_verts);
     
@@ -165,21 +164,7 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
         value = m->coords[i*3];
         value_bits ^= 0x80000000|(-(value_bits>>31));
         
-        sorted_indecies[offset_tables[value_bits & 0x7FF]++] = i;
-    }
-    
-    for(uint i = 0; i < end_index-start_index; i++)
-    {
-        union
-        {
-            float value;
-            uint32 value_bits;
-        };
-        
-        value = m->coords[3*sorted_indecies[i]];
-        value_bits ^= 0x80000000|(-(value_bits>>31));
-
-        hull_indecies[offset_tables[((value_bits>>11) & 0x7FF)+(2<<11)]++] = sorted_indecies[i];
+        hull_indecies[offset_tables[value_bits & 0x7FF]++] = i;
     }
     
     for(uint i = 0; i < end_index-start_index; i++)
@@ -193,7 +178,21 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
         value = m->coords[3*hull_indecies[i]];
         value_bits ^= 0x80000000|(-(value_bits>>31));
 
-        sorted_indecies[offset_tables[((value_bits>>22) & 0x7FF)+2*(2<<11)]++] = hull_indecies[i];
+        sorted_indecies[offset_tables[((value_bits>>11) & 0x7FF)+(2<<11)]++] = hull_indecies[i];
+    }
+    
+    for(uint i = 0; i < end_index-start_index; i++)
+    {
+        union
+        {
+            float value;
+            uint32 value_bits;
+        };
+        
+        value = m->coords[3*sorted_indecies[i]];
+        value_bits ^= 0x80000000|(-(value_bits>>31));
+
+        hull_indecies[offset_tables[((value_bits>>22) & 0x7FF)+2*(2<<11)]++] = sorted_indecies[i];
     }
     //sorted_indecies is sorted by increasing x
     //TODO: might not need to sort by x anymore
@@ -201,15 +200,19 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
     for(int i = 0; i < n_hull_verts; i++)
         printf("%d, (%f, %f, %f)\n",
                i,
-               m->verts[sorted_indecies[i]].x,
-               m->verts[sorted_indecies[i]].y,
-               m->verts[sorted_indecies[i]].z);
+               m->verts[hull_indecies[i]].x,
+               m->verts[hull_indecies[i]].y,
+               m->verts[hull_indecies[i]].z);
     printf("\n");
+    
+    uint8 * verts_to_keep = (uint8 *) free_memory;
+    memset(verts_to_keep, 0, (n_hull_verts+7)/8);
+    free_memory = (void *)((uint8 *) free_memory + (n_hull_verts+7)/8);
     
     //a must be less than b
     #define verts_to_sedge_sorted(a, b) verts_to_sedge_map[((b)*(b-1))/2+(a)]
     //no order requirement
-    #define verts_to_sedge(a, b) (((a) < (b)) ? verts_to_sedge_sorted(a, b) : verts_to_sedge_sorted(b, a) )
+    #define verts_to_sedge(a, b) (((a) < (b)) ? verts_to_sedge_sorted(a, b) : verts_to_sedge_sorted(b, a))
     #define no_sedge 0xFFFFFFFF
     #define used_sedge 0xFFFFFFFE
     
@@ -224,15 +227,15 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
     search_edge * sedges = (search_edge *) free_memory;
     free_memory = (void *)((search_edge *) free_memory + max_edges);
     uint first_vert = 0;
-    for(int i = 0; m->verts[sorted_indecies[i]].x == m->verts[sorted_indecies[0]].x; i++)
+    for(int i = 0; m->verts[hull_indecies[i]].x == m->verts[hull_indecies[0]].x; i++)
     {
-        if(m->verts[sorted_indecies[i]].y <= m->verts[sorted_indecies[first_vert]].y)
+        if(m->verts[hull_indecies[i]].y <= m->verts[hull_indecies[first_vert]].y)
         {
             first_vert = i;
         }
     }
     uint second_vert = 1;
-    #define slope(a, b) ((m->verts[sorted_indecies[b]].y-m->verts[sorted_indecies[a]].y)/(m->verts[sorted_indecies[b]].x-m->verts[sorted_indecies[a]].x))
+    #define slope(a, b) ((m->verts[hull_indecies[b]].y-m->verts[hull_indecies[a]].y)/(m->verts[hull_indecies[b]].x-m->verts[hull_indecies[a]].x))
     float highest_slope = slope(first_vert, second_vert);
     for(int i = 0; i < n_hull_verts; i++)
     {
@@ -247,15 +250,27 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
     #undef slope
     
     sedges[0] = (search_edge){first_vert, second_vert, cross((v3f){1.0, 0.0, 0.0},
-                                                             sub(m->verts[sorted_indecies[second_vert]],
-                                                                 m->verts[sorted_indecies[first_vert]]))};
+                                                             sub(m->verts[hull_indecies[second_vert]],
+                                                                 m->verts[hull_indecies[first_vert]]))};
     int n_sedges = 1;
     
     verts_to_sedge(first_vert, second_vert) = 0;
+
+    #define keep_vert(v) verts_to_keep[(v)/8] |= 1<<((v)%8)
+    keep_vert(first_vert);
+    keep_vert(second_vert);
     
-    uint n_verts_to_keep = 0;
-    hull_indecies[n_verts_to_keep++] = first_vert;
-    hull_indecies[n_verts_to_keep++] = second_vert;
+    //two way mapping, neighbor id's always refer to the same final vert
+    uint n_original_verts = n_hull_verts;
+    uint * neighbor_to_hull_vert_id = (uint *) free_memory; //values are decremented when hull verts are deleted
+    free_memory = (void *) ((uint *) free_memory + n_original_verts);
+    uint * hull_vert_to_neighbor_id = (uint *) free_memory; //elements are shifted when hull verts are deleted
+    free_memory = (void *) ((uint *) free_memory + n_hull_verts);
+    for(int i = 0; i < n_hull_verts; i++)
+    {//initialize arrays
+        neighbor_to_hull_vert_id[i] = i;
+        hull_vert_to_neighbor_id[i] = i;
+    }
     
     uint * first_neighbor_links = (uint *) free_memory; //table of first links for each vert
     //NOTE: this^ can be replaced with a hash table to save memory
@@ -271,79 +286,95 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
     {
         uint v0 = sedges[n_sedges].v0;
         uint v1 = sedges[n_sedges].v1;
-        printf("%d, %d\n", v0, v1);
+        //printf("%d, %d\n", v0, v1);
         v3f dir = sedges[n_sedges].dir;
-        printf("dir: (%f, %f, %f)\n", dir.x, dir.y, dir.z);
+        //printf("dir: (%f, %f, %f)\n", dir.x, dir.y, dir.z);
         
-        //TODO: skip verts that are already in the hull
         verts_to_sedge(v0, v1) = used_sedge;
         
         uint next_vert = 0;
         while(next_vert == v0 || next_vert == v1) next_vert++;
-        float highest_dot = dot(sub(m->verts[sorted_indecies[next_vert]], m->verts[sorted_indecies[v0]]), dir);
+        float highest_dot = dot(normalize(rejection(sub(m->verts[hull_indecies[next_vert]], m->verts[hull_indecies[v0]]),
+                                                    sub(m->verts[hull_indecies[v1]], m->verts[hull_indecies[v0]]))), dir);
         for(int i = 0; i < n_hull_verts; i++)
         {
             if(i == v0 || i == v1) continue;
-            float new_dot = dot(sub(m->verts[sorted_indecies[i]], m->verts[sorted_indecies[v0]]), dir);
+            float new_dot = dot(normalize(rejection(sub(m->verts[hull_indecies[i]], m->verts[hull_indecies[v0]]),
+                                                    sub(m->verts[hull_indecies[v1]], m->verts[hull_indecies[v0]]))), dir);
             if(new_dot > highest_dot)
             {
                 next_vert = i;
                 highest_dot = new_dot;
             }
         }
-        printf("next: %d\n", next_vert);
+        //printf("next: %d\n", next_vert);
         
         if(verts_to_sedge(v0, next_vert) == used_sedge){}
         else if(verts_to_sedge(v0, next_vert) == no_sedge)
         {
-            printf("adding %d, %d edge\n", v0, next_vert);
+            //printf("adding %d, %d edge\n", v0, next_vert);
             verts_to_sedge(v0, next_vert) = n_sedges;
             sedges[n_sedges++] = (search_edge){v0, next_vert,
-                                               rejection(sub(m->verts[sorted_indecies[next_vert]], m->verts[sorted_indecies[v1]]),
-                                                         sub(m->verts[sorted_indecies[next_vert]], m->verts[sorted_indecies[v0]]))};
+                                               rejection(sub(m->verts[hull_indecies[next_vert]], m->verts[hull_indecies[v1]]),
+                                                         sub(m->verts[hull_indecies[next_vert]], m->verts[hull_indecies[v0]]))};
             addEdgeToLinkedLists(first_neighbor_links, neighbors, n_neighbor_links, v0, next_vert);
-            hull_indecies[n_verts_to_keep++] = next_vert;//TODO(IMPORTANT): don't add more than once
+            keep_vert(next_vert);
         }
         else
         {
-            printf("closing %d, %d edge\n", v0, next_vert);
+            //printf("closing %d, %d edge\n", v0, next_vert);
             sedges[verts_to_sedge(v0, next_vert)] = sedges[--n_sedges];
-            verts_to_sedge(v0, n_sedges) = used_sedge;
+            /* n_sedges--; */
+            /* for(int i = verts_to_sedge(v0, next_vert); i < n_sedges; i++) sedges[i] = sedges[i+1]; */
+            verts_to_sedge(v0, next_vert) = used_sedge;
         }
         
         if(verts_to_sedge(v1, next_vert) == used_sedge){}
         else if(verts_to_sedge(v1, next_vert) == no_sedge)
         {
-            printf("adding %d, %d edge\n", v1, next_vert);
+            //printf("adding %d, %d edge\n", v1, next_vert);
             verts_to_sedge(v1, next_vert) = n_sedges;
             sedges[n_sedges++] = (search_edge){v1, next_vert,
-                                               rejection(sub(m->verts[sorted_indecies[next_vert]], m->verts[sorted_indecies[v0]]),
-                                                         sub(m->verts[sorted_indecies[next_vert]], m->verts[sorted_indecies[v1]]))};
-            printf("(%f, %f, %f)\n", sedges[n_sedges-1].dir.x, sedges[n_sedges-1].dir.y, sedges[n_sedges-1].dir.z);
+                                               rejection(sub(m->verts[hull_indecies[next_vert]], m->verts[hull_indecies[v0]]),
+                                                         sub(m->verts[hull_indecies[next_vert]], m->verts[hull_indecies[v1]]))};
+            //printf("(%f, %f, %f)\n", sedges[n_sedges-1].dir.x, sedges[n_sedges-1].dir.y, sedges[n_sedges-1].dir.z);
             addEdgeToLinkedLists(first_neighbor_links, neighbors, n_neighbor_links, v1, next_vert);
-            if(hull_indecies[n_verts_to_keep-1] != next_vert) hull_indecies[n_verts_to_keep++] = next_vert;
+            keep_vert(next_vert);
         }
         else
         {
-            printf("closing %d, %d edge\n", v1, next_vert);
+            //printf("closing %d, %d edge\n", v1, next_vert);
             sedges[verts_to_sedge(v1, next_vert)] = sedges[--n_sedges];
-            verts_to_sedge(v1, n_sedges) = used_sedge;
+            /* n_sedges--; */
+            /* for(int i = verts_to_sedge(v1, next_vert); i < n_sedges; i++) sedges[i] = sedges[i+1]; */
+            verts_to_sedge(v1, next_vert) = used_sedge;
         }
-
-        printf("n_sedges: %d\n", n_sedges);
-        for(int i = 0; i < max_edges; i++)
+        
+        /* //printf("n_sedges: %d\n", n_sedges); */
+        /* for(int i = 0; i < max_edges; i++) */
+        /* { */
+        /*     //printf("verts_to_sedge %d: %d\n", i, verts_to_sedge_map[i]); */
+        /* } */
+    }
+    
+    uint n_verts_to_keep = 0;
+    for(int i = 0; i < n_hull_verts; i++)
+    {
+        if((verts_to_keep[i/8]>>i%8)&1)
         {
-            printf("verts_to_sedge %d: %d\n", i, verts_to_sedge_map[i]);
+            neighbor_to_hull_vert_id[i] -= i-n_verts_to_keep;
+            hull_indecies[n_verts_to_keep] = hull_indecies[i];
+            hull_vert_to_neighbor_id[n_verts_to_keep] = hull_vert_to_neighbor_id[i];
+            n_verts_to_keep++;
         }
     }
     n_hull_verts = n_verts_to_keep;
-
-    //TODO: account for moving verts
+    
     for(int i = 0; i < n_hull_verts; i++)
     {
-        if(first_neighbor_links[i] != 0)
+        if(first_neighbor_links[hull_vert_to_neighbor_id[i]] != 0)
         {
-            uint current_link = first_neighbor_links[i];
+            uint current_link = first_neighbor_links[hull_vert_to_neighbor_id[i]];
             
             uint current_convex_index = m->convex_starts[m->n_convex_groups]+i;
             m->n_convex_neighbors[current_convex_index] = 0;
@@ -351,7 +382,8 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
             for(; current_link != 0; current_link = neighbors[current_link].next_link)
             {
                 m->n_convex_neighbors[current_convex_index]++;
-                m->convex_neighbors[m->n_total_convex_neighbors++] = neighbors[current_link].neighbor;
+                m->convex_neighbors[m->n_total_convex_neighbors++] =
+                    neighbor_to_hull_vert_id[neighbors[current_link].neighbor];
             }
         }
         else
@@ -370,7 +402,7 @@ void convexHull(mesh * m, uint start_index, uint end_index, void * free_memory)
     }
     
     printf("debug_edges:\n");
-    for(int i = 0; i < n_debug_edges; i++) printf("%d, %d\n", debug_edges[i].a, debug_edges[i].b);
+    for(int i = 0; i < n_debug_edges; i++) printf("%d, %d\n", neighbor_to_hull_vert_id[debug_edges[i].a], neighbor_to_hull_vert_id[debug_edges[i].b]);
 }
 
 struct support_return
@@ -565,7 +597,6 @@ inline bool isColliding(physics_object a, physics_object b, mesh * mesh_list)
             if(initial_support.distance < 0) continue;
             simplex[n_simplex_points++] = initial_support.point;
             dir = negative(simplex[0]);
-            //if(dot(dir, dir) <= sq(epsilon)) return true;
             
             //the 2 point case can only happen once
             support_return second_support = support(a, a_group, b, b_group, mesh_list, dir);
@@ -573,18 +604,16 @@ inline bool isColliding(physics_object a, physics_object b, mesh * mesh_list)
             if(second_support.distance < 0) continue;
             simplex[n_simplex_points++] = second_support.point;
             dir = rejection(negative(simplex[0]), sub(simplex[0], simplex[1]));
-            //if(dot(dir, dir) <= sq(epsilon)) return true;
             
             #define max_itterations 30
             for(int i = 0;; i++)
             {
-                dir = scale(normalize(dir), 1000);
+                dir = scale(normalize(dir), 1000);//TODO: this is an awful hack, do a real fix for precission issues
                 support_return new_support = support(a, a_group, b, b_group, mesh_list, dir);
                 if(new_support.distance < 0) break;
                 simplex[n_simplex_points++] = new_support.point;
                 
                 if(doSimplex(simplex, n_simplex_points, dir)) return true; //intersection found
-                //if(dot(dir, dir) <= sq(epsilon)) return true; //TODO: check if this is reasonable
                 if(i >= max_itterations) return true; //max itterations reached
             }
             #undef max_itterations
