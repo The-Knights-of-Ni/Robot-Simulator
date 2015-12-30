@@ -32,7 +32,7 @@ float shoulder_cm_dist = 9.0f;
 
 float spring_force = 2*2802000*0;
 
-float k_string = 100000000*0;
+float k_string = 100*0;
 
 float dc_motor_voltage = 14.0f;
 

@@ -109,7 +109,7 @@ void updateRobot(JNIEnv * env, jobject self)
             doButtonNW("string not engaged", 0.0, 0.0, 4, 2);
         }
         
-        float shoulder_motor_voltage = (arm_shoulder_power*dc_motor_voltage - neverest_k_i*prs.shoulder_omega*shoulder_gear_ratio);
+        float shoulder_motor_voltage = (arm_shoulder_power*dc_motor_voltage + neverest_k_i*prs.shoulder_omega*shoulder_gear_ratio);
         float shoulder_motor_tau = shoulder_motor_voltage*neverest_k_t_over_R*shoulder_gear_ratio*0;
         
         //TODO: add friction
@@ -121,13 +121,17 @@ void updateRobot(JNIEnv * env, jobject self)
         float forearm_tau_other = -string_tension*(forearm_length-forearm_cm_dist)*sin(string_theta-prs.forearm_theta)
             +spring_force*(forearm_cm_dist)*sin(inside_elbow_theta); //TODO: this is very approximate, might need to fix
         
-        v2f forearm_F_other = {-spring_force*cos(prs.shoulder_theta)-string_tension*cos(string_theta),
-                               -forearm_m*g-spring_force*sin(prs.shoulder_theta)-string_tension*sin(string_theta)};
+        v2f forearm_F_other = {-spring_force*cos(prs.shoulder_theta)-string_tension*cos(string_theta)
+                               +forearm_m*(forearm_cm_dist*sq(prs.forearm_omega)*cos(prs.forearm_theta)
+                                           +shoulder_length*sq(prs.shoulder_omega)*cos(prs.shoulder_theta)),
+                               -forearm_m*g-spring_force*sin(prs.shoulder_theta)-string_tension*sin(string_theta)
+                               +forearm_m*(forearm_cm_dist*sq(prs.forearm_omega)*sin(prs.forearm_theta)
+                                           +shoulder_length*sq(prs.shoulder_omega)*sin(prs.shoulder_theta))};
         
         m4x5f axle_force_equations = {
             shoulder_I, 0, shoulder_length*sin(prs.shoulder_theta), -shoulder_length*cos(prs.shoulder_theta), shoulder_tau_other,
             0, forearm_I, -forearm_cm_dist*sin(prs.forearm_theta), forearm_cm_dist*cos(prs.forearm_theta), forearm_tau_other,
-            forearm_m*shoulder_length*sin(prs.shoulder_theta), forearm_m*forearm_cm_dist*sin(prs.forearm_theta), 1, 0, -forearm_F_other.x,
+            -forearm_m*shoulder_length*sin(prs.shoulder_theta), -forearm_m*forearm_cm_dist*sin(prs.forearm_theta), -1, 0, forearm_F_other.x,
             forearm_m*shoulder_length*cos(prs.shoulder_theta), forearm_m*forearm_cm_dist*cos(prs.forearm_theta), 0, -1, forearm_F_other.y,
         };
         
@@ -162,24 +166,26 @@ void updateRobot(JNIEnv * env, jobject self)
         float new_inside_elbow_theta = prs.forearm_theta-prs.shoulder_theta;
         while(new_inside_elbow_theta < -pi) new_inside_elbow_theta += 2*pi;
         while(new_inside_elbow_theta > pi) new_inside_elbow_theta -= 2*pi;
-        /* if(new_inside_elbow_theta > pi*5/6) */
-        /* {//TODO: this does not apply a force to the shoulder bar like it would in real life */
-        /*     //play = 0; */
-        /*     //printf("greater: %f, %f\b", prs.forearm_theta, prs.shoulder_theta); */
-        /*     prs.forearm_theta = prs.shoulder_theta+pi*5/6; */
-        /*     while(prs.forearm_theta < -pi) prs.forearm_theta += 2*pi; */
-        /*     while(prs.forearm_theta > pi) prs.forearm_theta -= 2*pi; */
-        /*     prs.forearm_omega = 0; */
-        /* } */
-        /* if(new_inside_elbow_theta < -pi*5/6) */
-        /* { */
-        /*     //play = 0; */
-        /*     //printf("less: %f, %f\n", prs.forearm_theta, prs.shoulder_theta); */
-        /*     prs.forearm_theta = prs.shoulder_theta-pi*5/6; */
-        /*     while(prs.forearm_theta < -pi) prs.forearm_theta += 2*pi; */
-        /*     while(prs.forearm_theta > pi) prs.forearm_theta -= 2*pi; */
-        /*     prs.forearm_omega = 0; */
-        /* } */
+        if(new_inside_elbow_theta > pi*5/6)
+        {//TODO: this does not apply a force to the shoulder bar like it would in real life
+            //play = 0;
+            //printf("greater: %f, %f\b", prs.forearm_theta, prs.shoulder_theta);
+            prs.forearm_theta = prs.shoulder_theta+pi*5/6;
+            while(prs.forearm_theta < -pi) prs.forearm_theta += 2*pi;
+            while(prs.forearm_theta > pi) prs.forearm_theta -= 2*pi;
+            prs.forearm_omega = (shoulder_I*prs.shoulder_omega+forearm_I*prs.forearm_omega)/(shoulder_I+forearm_I);//TODO: this is fake
+            prs.shoulder_omega = (shoulder_I*prs.shoulder_omega+forearm_I*prs.forearm_omega)/(shoulder_I+forearm_I);
+        }
+        if(new_inside_elbow_theta < -pi*5/6)
+        {
+            //play = 0;
+            //printf("less: %f, %f\n", prs.forearm_theta, prs.shoulder_theta);
+            prs.forearm_theta = prs.shoulder_theta-pi*5/6;
+            while(prs.forearm_theta < -pi) prs.forearm_theta += 2*pi;
+            while(prs.forearm_theta > pi) prs.forearm_theta -= 2*pi;
+            prs.forearm_omega = (shoulder_I*prs.shoulder_omega+forearm_I*prs.forearm_omega)/(shoulder_I+forearm_I);//TODO: this is fake
+            prs.shoulder_omega = (shoulder_I*prs.shoulder_omega+forearm_I*prs.forearm_omega)/(shoulder_I+forearm_I);
+        }
         
         float winch_motor_voltage = (arm_winch_power*dc_motor_voltage - neverest_k_i*prs.winch_omega*2.0);
         float winch_motor_tau = winch_motor_voltage*neverest_k_t_over_R*2*2.0;
