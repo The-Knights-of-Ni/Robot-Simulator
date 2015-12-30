@@ -75,6 +75,27 @@ struct v4f
     }
 };
 
+struct v5f
+{
+    union
+    {
+        struct
+        {
+            float x;
+            float y;
+            float z;
+            float w;
+            float v;
+        };
+        float data[5];
+    };
+    
+    inline float & operator[](int a)
+    {
+        return data[a];
+    }
+};
+
 struct m3x3f
 {
     union
@@ -87,6 +108,26 @@ struct m3x3f
             v3f r2;
         };
         v3f rows[3];
+    };
+
+    inline float & operator[](int a)
+    {
+        return data[a];
+    }
+};
+
+struct __attribute__((aligned(16)))  m3x4f
+{
+    union
+    {
+        float data[12];
+        struct
+        {
+            v4f r0;
+            v4f r1;
+            v4f r2;
+        };
+        v4f rows[3];
     };
 
     inline float & operator[](int a)
@@ -115,7 +156,35 @@ struct __attribute__((aligned(16)))  m4x4f
         return data[a];
     }
 };
+
+struct m4x5f
+{
+    union
+    {
+        float data[20];
+        struct
+        {
+            v5f r0;
+            v5f r1;
+            v5f r2;
+            v5f r3;
+        };
+        v5f rows[4];
+    };
+
+    inline float & operator[](int a)
+    {
+        return data[a];
+    }
+};
 #pragma pack(pop)
+
+v2f add(v2f a, v2f b)
+{
+    v2f sum = {a[0]+b[0],
+               a[1]+b[1]};
+    return sum;
+}
 
 v3f negative(v3f a)
 {
@@ -296,6 +365,121 @@ inline m4x4f multiplyA( m4x4f a, m4x4f b)
     }
     
     return a;
+}
+
+v4f sub(v4f a, v4f b)
+{
+    v4f sum = {a[0]-b[0],
+               a[1]-b[1],
+               a[2]-b[2],
+               a[3]-b[3]};
+    return sum;
+}
+
+v4f scale(v4f v, float s)
+{
+    v4f product = {v[0]*s,
+                   v[1]*s,
+                   v[2]*s,
+                   v[3]*s};
+    return product;
+}
+
+v5f sub(v5f a, v5f b)
+{
+    v5f sum = {a[0]-b[0],
+               a[1]-b[1],
+               a[2]-b[2],
+               a[3]-b[3],
+               a[4]-b[4]};
+    return sum;
+}
+
+v5f scale(v5f v, float s)
+{
+    v5f product = {v[0]*s,
+                   v[1]*s,
+                   v[2]*s,
+                   v[3]*s,
+                   v[4]*s};
+    return product;
+}
+
+//TODO: handle 0s in unfortunate spots
+v4f solve(m4x5f equations)
+{
+    /* printf("before\n"); */
+    /* for(int r = 0; r < 4; r++) */
+    /* { */
+    /*     for(int c = 0; c < 5; c++) */
+    /*     { */
+    /*         printf("%f, ", equations.rows[r][c]); */
+    /*     } */
+    /*     printf("\n"); */
+    /* } */
+    /* printf("\nafter\n"); */
+        
+    for(int c = 0; c < 4; c++)
+    {
+        for(int r = c+1; r < 4; r++)
+        {
+            while(fabs(equations.rows[r][c]) > 0.1) //for floating point error
+                equations.rows[r] = sub(equations.rows[r], scale(equations.rows[c], equations.rows[r][c]/equations.rows[c][c]));
+        }
+    }
+    
+    for(int c = 3; c >= 0; c--)
+    {
+        for(int r = c-1; r >= 0; r--)
+        {
+            while(fabs(equations.rows[r][c]) > 0.1)
+                equations.rows[r] = sub(equations.rows[r], scale(equations.rows[c], equations.rows[r][c]/equations.rows[c][c]));
+        }
+    }
+    /* for(int r = 0; r < 4; r++) */
+    /* { */
+    /*     for(int c = 0; c < 5; c++) */
+    /*     { */
+    /*         printf("%f, ", equations.rows[r][c]); */
+    /*     } */
+    /*     printf("\n"); */
+    /* } */
+    /* printf("\n"); */
+    
+    v4f solutions;
+    for(int i = 0; i < 4; i++)
+    {
+        solutions[i] = equations.rows[i][4]/equations.rows[i][i];
+        /* printf("solutions[%d] = %f = %f / %f\n", i, solutions[i], equations.rows[i][4], equations.rows[i][i]); */
+    }
+    return solutions;
+}
+
+v3f solve(m3x4f equations)
+{    
+    for(int c = 0; c < 3; c++)
+    {
+        for(int r = c+1; r < 3; r++)
+        {
+            equations.rows[r] = sub(equations.rows[r], scale(equations.rows[c], equations.rows[r][c]/equations.rows[c][c]));
+        }
+    }
+    
+    for(int c = 2; c >= 0; c--)
+    {
+        for(int r = c-1; r >= 0; r--)
+        {
+            equations.rows[r] = sub(equations.rows[r], scale(equations.rows[c], equations.rows[r][c]/equations.rows[c][c]));
+        }
+    }
+    
+    v3f solutions;
+    for(int i = 0; i < 3; i++)
+    {
+        solutions[i] = equations.rows[i][3]/equations.rows[i][i];
+        /* printf("solutions[%d] = %f = %f / %f\n", i, solutions[i], equations.rows[i][3], equations.rows[i][i]); */
+    }
+    return solutions;
 }
 
 //NOTE: this is fast for small values of a, there are better algorithms for random 32 bit integers
