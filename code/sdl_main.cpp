@@ -149,7 +149,7 @@ int main(int n_arg, char * args[])
     //glEnable(GL_DEBUG_OUTPUT);
     #endif
     
-    void * memory = (byte *) malloc(1*gigabyte);
+    void * memory = (byte *) malloc(0.5*gigabyte);
     void * free_memory = memory;
     
     //font stuff

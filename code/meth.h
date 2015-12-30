@@ -417,25 +417,49 @@ v4f solve(m4x5f equations)
     /*     } */
     /*     printf("\n"); */
     /* } */
-    /* printf("\nafter\n"); */
-        
-    for(int c = 0; c < 4; c++)
-    {
-        for(int r = c+1; r < 4; r++)
-        {
-            while(fabs(equations.rows[r][c]) > 0.1) //for floating point error
-                equations.rows[r] = sub(equations.rows[r], scale(equations.rows[c], equations.rows[r][c]/equations.rows[c][c]));
-        }
-    }
+    /* printf("\n"); */
     
-    for(int c = 3; c >= 0; c--)
+    float epsilon = 0.1;
+    float zero = 0.0001;
+
+    //Guass-Jordan algorithm
+    for(int i = 0, j = 0; i < 4 && j < 5; i++, j++)
     {
-        for(int r = c-1; r >= 0; r--)
+        if(fabs(equations.rows[i][j]) < epsilon)
         {
-            while(fabs(equations.rows[r][c]) > 0.1)
-                equations.rows[r] = sub(equations.rows[r], scale(equations.rows[c], equations.rows[r][c]/equations.rows[c][c]));
+            for(int r = i+1; r < 4; r++)
+            {
+                //TODO handle case where entire column is 0
+                if(fabs(equations.rows[r][j]) >= epsilon)
+                {
+                    v5f temp = equations.rows[i];
+                    equations.rows[i] = equations.rows[r];
+                    equations.rows[r] = temp;
+                }
+            }
+        }
+        equations.rows[i] = scale(equations.rows[i], 1.0f/equations.rows[i][j]);
+        for(int r = 0; r < 4; r++)
+        {
+            if(r == i) continue;
+            do
+            {
+                equations.rows[r] = sub(equations.rows[r], scale(equations.rows[i], equations.rows[r][j]));
+            } while(fabs(equations.rows[r][j]) > zero); //for floating point error
+            
+        /*     for(int r = 0; r < 4; r++) */
+        /*     { */
+        /*         for(int c = 0; c < 5; c++) */
+        /*         { */
+        /*             printf("%f, ", equations.rows[r][c]); */
+        /*         } */
+        /*         printf("\n"); */
+        /*     } */
+        /*     printf("\n"); */
         }
     }
+
+    /* printf("after\n"); */
     /* for(int r = 0; r < 4; r++) */
     /* { */
     /*     for(int c = 0; c < 5; c++) */
@@ -449,7 +473,7 @@ v4f solve(m4x5f equations)
     v4f solutions;
     for(int i = 0; i < 4; i++)
     {
-        solutions[i] = equations.rows[i][4]/equations.rows[i][i];
+        solutions[i] = equations.rows[i][4];
         /* printf("solutions[%d] = %f = %f / %f\n", i, solutions[i], equations.rows[i][4], equations.rows[i][i]); */
     }
     return solutions;
