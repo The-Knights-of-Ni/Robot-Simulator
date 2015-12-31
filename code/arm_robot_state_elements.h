@@ -40,7 +40,7 @@ bool8 play = 0;
 void updateRobot(JNIEnv * env, jobject self)
 {
     
-    float dt = 0.0005*1;
+    float dt = 0.0005*0.1;
     
     float x_pos = 0;
     if(doButtonNW("pause", x_pos, -0.5, 4, 2))
@@ -110,21 +110,21 @@ void updateRobot(JNIEnv * env, jobject self)
         }
         
         float shoulder_motor_voltage = (arm_shoulder_power*dc_motor_voltage + neverest_k_i*prs.shoulder_omega*shoulder_gear_ratio);
-        float shoulder_motor_tau = shoulder_motor_voltage*neverest_k_t_over_R*shoulder_gear_ratio*0;
+        float shoulder_motor_tau = shoulder_motor_voltage*neverest_k_t_over_R*shoulder_gear_ratio;
         
         //TODO: add friction
         //all of the torques not including the axle
         
         float shoulder_tau_other = shoulder_motor_tau - shoulder_cm_dist*shoulder_m*g*cos(prs.shoulder_theta)
-            -spring_force*elbow_pulley_r;//TODO: think more carefully if this is correct
+            -spring_force*elbow_pulley_r;
         
         float forearm_tau_other = -string_tension*(forearm_length-forearm_cm_dist)*sin(string_theta-prs.forearm_theta)
-            +spring_force*(forearm_cm_dist)*sin(inside_elbow_theta); //TODO: this is very approximate, might need to fix
+            +spring_force*elbow_pulley_r;
         
-        v2f forearm_F_other = {-spring_force*cos(prs.shoulder_theta)-string_tension*cos(string_theta)
+        v2f forearm_F_other = {-string_tension*cos(string_theta)
                                +forearm_m*(forearm_cm_dist*sq(prs.forearm_omega)*cos(prs.forearm_theta)
                                            +shoulder_length*sq(prs.shoulder_omega)*cos(prs.shoulder_theta)),
-                               -forearm_m*g-spring_force*sin(prs.shoulder_theta)-string_tension*sin(string_theta)
+                               -forearm_m*g-string_tension*sin(string_theta)
                                +forearm_m*(forearm_cm_dist*sq(prs.forearm_omega)*sin(prs.forearm_theta)
                                            +shoulder_length*sq(prs.shoulder_omega)*sin(prs.shoulder_theta))};
         
@@ -140,7 +140,7 @@ void updateRobot(JNIEnv * env, jobject self)
         assert(axle_force_solutions[1] == axle_force_solutions[1]);
         assert(axle_force_solutions[2] == axle_force_solutions[2]);
         assert(axle_force_solutions[3] == axle_force_solutions[3]);
-                
+        
         v2f axle_force = {axle_force_solutions[2], axle_force_solutions[3]};
         
         float shoulder_alpha = axle_force_solutions[0];
@@ -171,20 +171,18 @@ void updateRobot(JNIEnv * env, jobject self)
             //play = 0;
             //printf("greater: %f, %f\b", prs.forearm_theta, prs.shoulder_theta);
             prs.forearm_theta = prs.shoulder_theta+pi*5/6;
-            while(prs.forearm_theta < -pi) prs.forearm_theta += 2*pi;
-            while(prs.forearm_theta > pi) prs.forearm_theta -= 2*pi;
-            prs.forearm_omega = (shoulder_I*prs.shoulder_omega+forearm_I*prs.forearm_omega)/(shoulder_I+forearm_I);//TODO: this is fake
-            prs.shoulder_omega = (shoulder_I*prs.shoulder_omega+forearm_I*prs.forearm_omega)/(shoulder_I+forearm_I);
+            /* while(prs.forearm_theta < -pi) prs.forearm_theta += 2*pi; */
+            /* while(prs.forearm_theta > pi) prs.forearm_theta -= 2*pi; */
+            prs.forearm_omega = prs.shoulder_omega;
         }
         if(new_inside_elbow_theta < -pi*5/6)
         {
             //play = 0;
             //printf("less: %f, %f\n", prs.forearm_theta, prs.shoulder_theta);
             prs.forearm_theta = prs.shoulder_theta-pi*5/6;
-            while(prs.forearm_theta < -pi) prs.forearm_theta += 2*pi;
-            while(prs.forearm_theta > pi) prs.forearm_theta -= 2*pi;
-            prs.forearm_omega = (shoulder_I*prs.shoulder_omega+forearm_I*prs.forearm_omega)/(shoulder_I+forearm_I);//TODO: this is fake
-            prs.shoulder_omega = (shoulder_I*prs.shoulder_omega+forearm_I*prs.forearm_omega)/(shoulder_I+forearm_I);
+            /* while(prs.forearm_theta < -pi) prs.forearm_theta += 2*pi; */
+            /* while(prs.forearm_theta > pi) prs.forearm_theta -= 2*pi; */
+            prs.forearm_omega = prs.shoulder_omega;
         }
         
         float winch_motor_voltage = (arm_winch_power*dc_motor_voltage - neverest_k_i*prs.winch_omega*2.0);

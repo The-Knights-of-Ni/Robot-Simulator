@@ -30,9 +30,9 @@ float forearm_cm_dist = 9.0f;
 float shoulder_length = 16.5f;
 float shoulder_cm_dist = 9.0f;
 
-float spring_force = 2*2802000*0;
+float spring_force = 2*2802000;
 
-float k_string = 100*0;
+float k_string = 1000000;
 
 float dc_motor_voltage = 14.0f;
 
@@ -42,7 +42,7 @@ float neverest_max_speed = 13.51; //in rad/s
 float neverest_k_i = dc_motor_voltage/neverest_max_speed;
 float neverest_k_t_over_R = neverest_max_torque/dc_motor_voltage;
 
-float string_length_0 = 29.908846;
+float string_length_0 = 29.908846+1;
 
 struct gamepad
 {
@@ -87,7 +87,7 @@ void JNI_main(JNIEnv * env, jobject self)
         x_pos = 0.0;
         if(doButtonNW("shoulder in", x_pos, -0.8, 4, 2))
         {
-            arm_shoulder_power = 1.0;
+            arm_shoulder_power = -1.0;
         }
         x_pos += getTextWidthInWindowUnits("shoulder in")+(2*4)*wx_scale;
         if(doButtonNW("shoulder off", x_pos , -0.8, 4, 2))
@@ -97,7 +97,7 @@ void JNI_main(JNIEnv * env, jobject self)
         x_pos += getTextWidthInWindowUnits("shoulder off")+(2*4)*wx_scale;
         if(doButtonNW("shoulder out", x_pos, -0.8, 4, 2))
         {
-            arm_shoulder_power = -1.0;
+            arm_shoulder_power = 1.0;
         }
         ///////////////////////////////////////////
         
