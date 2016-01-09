@@ -124,6 +124,16 @@ physical_robot_derivatives getDerivatives(physical_robot_state s)
           (s.shoulder_omega<-0.1 ?-100000:0))
         +(s.forearm_omega-s.shoulder_omega>0.1 ? 100000 :
           (s.forearm_omega-s.shoulder_omega<-0.1 ?-100000:0));
+
+    //TODO: add shoulder stop
+    if(s.shoulder_theta < 0)
+    {
+        shoulder_tau_other -= 1000000000*s.shoulder_theta;
+    }
+    if(s.shoulder_theta > pi)
+    {
+        shoulder_tau_other -= 1000000000*(s.shoulder_theta-pi);
+    }
     
     float forearm_tau_other = -string_tension*string_moment_arm
         +spring_force*elbow_pulley_r
