@@ -16,7 +16,7 @@ float winch_pulley_r = 1.0f;
 float shoulder_pulley_r = 1.0f;
 float elbow_pulley_r = 2.0f;
 
-float winch_I = 100.0; //the rotational inertia of the forearm
+float winch_I = 1000.0; //the rotational inertia of the forearm
 
 float shoulder_I = 81.0f*80; //the rotational inertia of the shoulder
 float shoulder_m = 80.0f;
@@ -32,7 +32,7 @@ float shoulder_cm_dist = 9.0f;
 
 float spring_force = 2*2802000;
 
-float k_string = 1000000;
+float k_string = 10000000;
 
 float dc_motor_voltage = 14.0f;
 
@@ -87,7 +87,7 @@ void JNI_main(JNIEnv * env, jobject self)
         x_pos = 0.0;
         if(doButtonNW("shoulder in", x_pos, -0.8, 4, 2))
         {
-            arm_shoulder_power = -1.0;
+            arm_shoulder_power = 1.0;
         }
         x_pos += getTextWidthInWindowUnits("shoulder in")+(2*4)*wx_scale;
         if(doButtonNW("shoulder off", x_pos , -0.8, 4, 2))
@@ -97,7 +97,7 @@ void JNI_main(JNIEnv * env, jobject self)
         x_pos += getTextWidthInWindowUnits("shoulder off")+(2*4)*wx_scale;
         if(doButtonNW("shoulder out", x_pos, -0.8, 4, 2))
         {
-            arm_shoulder_power = 1.0;
+            arm_shoulder_power = -1.0;
         }
         ///////////////////////////////////////////
         
