@@ -5,7 +5,7 @@
 #include "ui.h"
 #include "renderer.h"
 
-#include "arm.h" //TODO: this should be loaded from a dll
+#include "arm_test.h" //TODO: this should be loaded from a dll
 
 void APIENTRY glErrorCallback(GLenum source, GLenum type, uint id, GLenum severity, GLsizei length, const char * message, void * userParam)
 {
@@ -475,6 +475,7 @@ int main(int n_arg, char * args[])
     float angle0 = 0.0;
     float angle1 = 0.0;
     
+    int frame_counter = 0;
     for ever
     {
         prev_left_click = left_click;
@@ -606,7 +607,9 @@ int main(int n_arg, char * args[])
         {
             angle0 -= 0.1;
         }
-        JNI_main(0, (jobject){});
+        
+        if((frame_counter++)%20 == 0) JNI_main(0, (jobject){});
+        simulateAndRender();
         
         SDL_GL_SwapWindow(window);
     }

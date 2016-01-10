@@ -1,6 +1,8 @@
 #ifndef UI
 #define UI
 
+//#include "meth,h"
+
 //default window size
 static int window_width = 640;
 static int window_height = 480;
@@ -112,6 +114,13 @@ void drawText(float px0, float py0, char * s)
     //glEnd();
 }
 
+float getButtonHeight(float y_padding)
+{
+    return (stbtt_ScaleForPixelHeight(&font_info, 16)*wy_scale*(
+                          font_ascent -
+                          font_descent)+y_padding*2);
+}
+
 bool doButtonNW(char * string, float x0, float y1, float x_padding, float y_padding)
 {    
     float width = getTextWidthInWindowUnits(string);            
@@ -145,5 +154,60 @@ bool doButtonNW(char * string, float x0, float y1, float x_padding, float y_padd
     drawText(x0+x_padding, y1-(stbtt_ScaleForPixelHeight(&font_info, 16)*wy_scale*font_ascent+y_padding), string);
     
     return over && !left_click && prev_left_click;
+}
+
+struct virtual_joystick
+{
+    v2f joystick;
+    bool held;
+};
+virtual_joystick doVirtualJoystickNW(bool held, float x0, float y1, float width, float height)
+{    
+    float y0 = y1 - height*wy_scale;
+    float x1 = x0 + width *wx_scale;
+    
+    int x;
+    int y;
+    SDL_GetMouseState(&x, &y);
+    float mx = x*wx_scale-1.0;
+    float my = -(y*wy_scale-1.0);
+    
+    glUniform1i(ui_mode, 0);
+    bool over = mx > x0 && mx < x1 && my > y0 && my < y1;
+    
+    if(left_click)
+    {
+        if(over) held = true;
+    }
+    else
+    {
+        held = false;
+    }
+    
+    v2f joystick = {};
+    if(held)
+    {
+        joystick.x = clamp(2*((mx-x0)/(x1-x0)-0.5), -1.0, 1.0);
+        joystick.y = clamp(2*((my-y0)/(y1-y0)-0.5), -1.0, 1.0);
+    }
+    
+    if(over) glUniform3f(ui_color, 1.0, 1.0, 1.0);
+    else glUniform3f(ui_color, 0.5, 0.5, 0.5);
+    glUniform2f(ui_uv0, 0, 0);
+    glUniform2f(ui_uv1, 0, 0);
+    glUniform2f(ui_c0, x0, y0);
+    glUniform2f(ui_c1, x1, y1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    
+    //draw joystick dot
+    float dot_size = 8;
+    glUniform3f(ui_color, 0.0, 0.0, 0.0);
+    glUniform2f(ui_uv0, 0, 0);
+    glUniform2f(ui_uv1, 0, 0);
+    glUniform2f(ui_c0, (x1-x0)/2*joystick.x+(x0+x1)/2-dot_size*wx_scale, (y1-y0)/2*joystick.y+(y0+y1)/2-dot_size*wy_scale);
+    glUniform2f(ui_c1, (x1-x0)/2*joystick.x+(x0+x1)/2+dot_size*wx_scale, (y1-y0)/2*joystick.y+(y0+y1)/2+dot_size*wy_scale);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    
+    return {joystick, held};
 }
 #endif

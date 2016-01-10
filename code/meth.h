@@ -1,9 +1,9 @@
+#ifndef METH
+#define METH
+
 #include "misc.h"
 #include <emmintrin.h>
 #include <math.h>
-
-#ifndef METH
-#define METH
 
 #pragma pack(push, 16)
 
