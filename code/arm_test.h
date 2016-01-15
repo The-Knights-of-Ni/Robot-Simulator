@@ -56,6 +56,109 @@ struct gamepad
 #include "arm_test_robot_state_elements.h"
 #include "meth.h"
 
+#if 0
+float runToPositionPolar(arm_state s, float shoulder_power, float winch_power, v2f target_polar_position)
+{
+    float projection_weight = 1;
+    float rejection_weight = 0.01;
+    
+    arm_derivatives d = getArmDerivatives(s, shoulder_power, winch_power);
+    //TODO: the actual robot code uses operator overloaded
+    //      vectors, should probably make the simulator match
+
+    float r = sqrt(sq(shoulder_length)+sq(forearm_length)-2*shoulder_length*forearm_length*cos(pi+s.forearm_theta-s.shoulder_theta));
+    float dr =
+        pow(sq(shoulder_length)+sq(forearm_length)-2*shoulder_length*forearm_length*cos(pi+s.forearm_theta-s.shoulder_theta), -3.0/2.0)
+        *2*shoulder_length*forearm_length*sin(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_omega-d.shoulder_omega);
+    float ddr = //TODO: fix for chain rule
+        + 2*shoulder_length*forearm_length*sin(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_alpha-d.shoulder_alpha)
+        + 2*shoulder_length*forearm_length*cos(pi+s.forearm_theta-s.shoulder_theta)*sq(d.forearm_omega-d.shoulder_omega);
+    
+    float theta_off = asin(forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta));
+    float dtheta_off =
+        //f'(g*h)
+        1/sqrt(1-sq(forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta)))
+        //*(g'h
+        *(-forearm_length/sq(r)*dr*sin(pi+s.forearm_theta-s.shoulder_theta)
+          //+gh')
+          +forearm_length/r*cos(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_omega-d.shoulder_omega));
+    
+    v2f polar_acceleration = {
+        //r
+        -d.winch_alpha,
+        //theta
+        +d.shoulder_alpha
+        -((pow(1-sq(forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta)), -3.0/2.0)
+           -2*forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta)
+           *cos(pi+s.forearm_theta-s.shoulder_theta)
+           *(s.forearm_omega-s.shoulder_omega))
+          *(+forearm_length/(r*r*r)*sq(dr)*sin(pi+s.forearm_theta-s.shoulder_theta)
+            -forearm_length/sq(r)*ddr*sin(pi+s.forearm_theta-s.shoulder_theta)
+            -forearm_length/sq(r)*dr*cos(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_omega-d.shoulder_omega)
+          
+            -forearm_length/sq(r)*dr*cos(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_omega-d.shoulder_omega)
+            +forearm_length/r*cos(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_alpha-d.shoulder_alpha)
+            -forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta)*sq(d.forearm_omega-d.shoulder_omega)))
+    };
+
+    //target_polar_position.y = -(d.shoulder_omega-dtheta_off);
+    
+    float heuristic =
+        -normsq(sub((v2f){winch_power, shoulder_power},
+                    (v2f){2*(-d.winch_omega),
+                            3*(1+target_polar_position.y-s.shoulder_theta+theta_off) -0.1*(d.shoulder_omega+dr)}));
+    return heuristic;
+}
+#endif
+
+float armHeuristic(arm_state s, float shoulder_power, float winch_power, v2f target_acceleration, float r, float dr, float theta_off, float dtheta_off)
+{    
+    arm_derivatives d = getArmDerivatives(s, shoulder_power, winch_power);
+    //TODO: the actual robot code uses operator overloaded
+    //      vectors, should probably make the simulator match
+    
+    float ddr = //TODO: fix for chain rule
+        + 2*shoulder_length*forearm_length*sin(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_alpha-d.shoulder_alpha)
+        + 2*shoulder_length*forearm_length*cos(pi+s.forearm_theta-s.shoulder_theta)*sq(d.forearm_omega-d.shoulder_omega);
+
+    float ddtheta_off =
+        //(f'(g*h))'
+        (pow(1-sq(forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta)), -3.0/2.0)
+         -2*forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta)
+         *(forearm_length/r*cos(pi+s.forearm_theta-s.shoulder_theta)*(s.forearm_omega-s.shoulder_omega)
+           -forearm_length/sq(r)*dr*sin(pi+s.forearm_theta-s.shoulder_theta)))
+        //*((g'h)'
+        *(+2*forearm_length/(r*r*r)*sq(dr)*sin(pi+s.forearm_theta-s.shoulder_theta)
+          -forearm_length/sq(r)*ddr*sin(pi+s.forearm_theta-s.shoulder_theta)
+          -forearm_length/sq(r)*dr*cos(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_omega-d.shoulder_omega)
+          //+(gh')')
+          -forearm_length/sq(r)*dr*cos(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_omega-d.shoulder_omega)
+          +forearm_length/r*cos(pi+s.forearm_theta-s.shoulder_theta)*(d.forearm_alpha-d.shoulder_alpha)
+          -forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta)*sq(d.forearm_omega-d.shoulder_omega));
+
+    
+    bool8 winch_mode = s.forearm_theta+pi-s.shoulder_theta < (acos((elbow_pulley_r-shoulder_pulley_r)/shoulder_length)+acos(elbow_pulley_r/forearm_length));
+    
+    v2f polar_acceleration = {
+        //r
+        winch_mode ? ((d.winch_alpha-d.shoulder_alpha)*winch_pulley_r) : ddr,
+        //theta
+        +d.shoulder_alpha
+        -ddtheta_off
+    };
+
+    //target_acceleration.y = -(d.shoulder_omega-dtheta_off);
+    
+    float heuristic =
+        /* dot(polar_acceleration, */
+        /*     (v2f){10*(1+target_acceleration.x)-r-d.winch_omega, */
+        /*             1+target_acceleration.y-s.shoulder_theta+theta_off -0.1*(d.shoulder_omega+dr)}); */
+        -abs(polar_acceleration.x-target_acceleration.x)-100*abs(polar_acceleration.y-target_acceleration.y);
+        //-normsq(sub(polar_acceleration, target_acceleration));
+        //dot(polar_acceleration, target_acceleration);
+    return heuristic;
+}
+
 extern "C"
 void JNI_main(JNIEnv * env, jobject self)
 {
@@ -77,60 +180,73 @@ void JNI_main(JNIEnv * env, jobject self)
         //TODO: treat it like it's from an encoder
         {
             arm_state s = prs;
-            v2f target_velocity_dir = gamepad2.right_stick;
-            if(normsq(target_velocity_dir) > 0.0)
+            v2f target_velocity = gamepad2.right_stick;
+            if(normsq(target_velocity) > 0.0)
             {
                 //TODO: possibly itterate over a smaller and smaller region for better
                 //performance and precission
 
-                float w_step = 0.02;
-                float s_step = 0.02;
+                float winch_power_step = 0.1;
+                float shoulder_power_step = 0.1;
                 //loop over a range of motor powers to find the closest one
-                v2f linear_velocity = {
-                    //x
-                    -shoulder_length*s.shoulder_omega*sin(s.shoulder_theta)
-                    -forearm_length*s.forearm_omega*sin(s.forearm_theta)
-                    //y
-                    +shoulder_length*s.shoulder_omega*cos(s.shoulder_theta)
-                    +forearm_length*s.forearm_omega*cos(s.forearm_theta)
-                };
                 
-                float linear_speed = norm(linear_velocity);
-                v2f target_linear_velocity = normalizeScale(target_velocity_dir, linear_speed);
-                v2f target_acceleration_dir = sub(target_linear_velocity, linear_velocity);
+                float r = sqrt(sq(shoulder_length)+sq(forearm_length)-2*shoulder_length*forearm_length*cos(pi+s.forearm_theta-s.shoulder_theta));
+                float dr =
+                    1/2*invsqrt(sq(shoulder_length)+sq(forearm_length)-2*shoulder_length*forearm_length*cos(pi+s.forearm_theta-s.shoulder_theta))
+                    *2*shoulder_length*forearm_length*sin(pi+s.forearm_theta-s.shoulder_theta)*(s.forearm_omega-s.shoulder_omega);
+                    
+                float theta_off = asin(forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta));
+                float dtheta_off =
+                    //f'(g*h)
+                    invsqrt(1-sq(forearm_length/r*sin(pi+s.forearm_theta-s.shoulder_theta)))
+                    //*(g'h
+                    *(-forearm_length/sq(r)*dr*sin(pi+s.forearm_theta-s.shoulder_theta)
+                      //+gh')
+                      +forearm_length/r*cos(pi+s.forearm_theta-s.shoulder_theta)*(s.forearm_omega-s.shoulder_omega));
 
-                #define projection_weight 1
-                #define rejection_weight 1
                 
-                float best_heuristic = 0;
-                float best_shoulder_power = 0;
-                float best_winch_power = 0;
-                //TODO: this is really SIMDable/multithreadable if it's running slowly
-                for(float winch_power = -1.0; winch_power < 1.0; winch_power += w_step)
+                v2f polar_velocity = {
+                    //r
+                    dr,
+                    //theta
+                    s.shoulder_omega
+                    //-dtheta_off
+                };
+
+                v2f target_polar_velocity = target_velocity;
+                target_polar_velocity.y = 0;
+                /* v2f target_polar_velocity = { */
+                /*     target_velocity.x*cos(s.shoulder_theta)-target_velocity.y*sin(s.shoulder_theta), */
+                /*     target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta) */
+                /* }; */
+                
+                //TODO: properly convert polar speeds
+                float linear_speed = 100.0;//norm(polar_velocity);
+                target_polar_velocity = scale(target_polar_velocity, linear_speed);
+                //TODO: clamp acceleration based on frame rate so it doesn't overshoot
+                v2f target_acceleration_dir = scale(sub(target_polar_velocity, polar_velocity), 100);
+                
+                float best_heuristic;
+                float best_shoulder_power;
+                float best_winch_power;
                 {
-                    for(float shoulder_power = -1.0; shoulder_power < 1.0; shoulder_power += w_step)
+                    float winch_power = 0.0;
+                    float shoulder_power = 0.0;
+                    
+                    float heuristic = armHeuristic(s, shoulder_power, winch_power, target_acceleration_dir,
+                                                   r, dr, theta_off, dtheta_off);
+                    best_heuristic = heuristic;
+                    best_shoulder_power = shoulder_power;
+                    best_winch_power = winch_power;
+                }
+                //TODO: this is really SIMDable/multithreadable
+                for(float winch_power = -1.0; winch_power < 1.0; winch_power += winch_power_step)
+                {
+                    for(float shoulder_power = -1.0; shoulder_power < 1.0; shoulder_power += shoulder_power_step)
                     {
-                        arm_derivatives d = getArmDerivatives(s, shoulder_power, winch_power);
-                        //TODO: the actual robot code uses operator overloaded
-                        //      vectors, should probably make simulator match
-                        v2f linear_acceleration = {
-                            //x
-                            -shoulder_length*d.shoulder_alpha*sin(s.shoulder_theta) //tangential acceleration
-                            -shoulder_length*sq(d.shoulder_omega)*cos(s.shoulder_theta) //centripital acceleration
-                            -forearm_length*d.forearm_alpha*sin(s.forearm_theta)
-                            -forearm_length*sq(d.forearm_omega)*cos(s.forearm_theta),
-                            //y
-                            +shoulder_length*d.shoulder_alpha*cos(s.shoulder_theta) //tangential acceleration
-                            -shoulder_length*sq(d.shoulder_omega)*sin(s.shoulder_theta) //centripital acceleration
-                            +forearm_length*d.forearm_alpha*cos(s.forearm_theta)
-                            -forearm_length*sq(d.forearm_omega)*sin(s.forearm_theta)
-                        };
-                        
-                        float heuristic =
-                            projection_weight*projDist(linear_acceleration, target_acceleration_dir)
-                            - rejection_weight*rejDist(linear_acceleration, target_acceleration_dir);
-                        
-                        if((winch_power == -1.0 && shoulder_power == -1.0) || heuristic > best_heuristic)
+                        float heuristic = armHeuristic(s, shoulder_power, winch_power, target_acceleration_dir,
+                                                       r, dr, theta_off, dtheta_off);
+                        if(heuristic > best_heuristic)
                         {
                             best_heuristic = heuristic;
                             best_shoulder_power = shoulder_power;
@@ -138,11 +254,13 @@ void JNI_main(JNIEnv * env, jobject self)
                         }
                     }
                 }
-                arm_shoulder_power = best_winch_power;
+                arm_shoulder_power = best_shoulder_power;
                 arm_winch_power = best_winch_power;
             }
             else
             {
+                arm_shoulder_power = 0;
+                arm_winch_power = 0;
                 //TODO: remember and hold position if joystick is 0
             }
         }

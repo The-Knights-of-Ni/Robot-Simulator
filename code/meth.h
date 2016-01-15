@@ -179,11 +179,85 @@ struct m4x5f
 };
 #pragma pack(pop)
 
-v2f add(v2f a, v2f b)
+inline float32 invsqrt(float32 a)
+{
+    uint32 ai = *(uint32 *) &a;
+    union
+    {
+        uint32 isqrti;
+        float32 isqrt;
+    };
+    isqrti = 0x5f375a86 - (ai >> 1); //magic meth
+    isqrt *= (1.5f - (a*0.5f*isqrt*isqrt));
+    return isqrt;
+}
+
+inline v2f add(v2f a, v2f b)
 {
     v2f sum = {a[0]+b[0],
                a[1]+b[1]};
     return sum;
+}
+
+inline v2f sub(v2f a, v2f b)
+{
+    v2f sum = {a[0]-b[0],
+               a[1]-b[1]};
+    return sum;
+}
+
+inline v2f scale(v2f v, float s)
+{
+    v2f product = {v[0]*s,v[1]*s};
+    return product;
+}
+
+inline float dot(v2f a, v2f b)
+{
+    return a[0]*b[0]+a[1]*b[1];
+}
+
+inline float normsq(v2f a)
+{
+    return dot(a, a);
+}
+
+inline float norm(v2f a)
+{
+    return sqrt(normsq(a));
+}
+
+inline float invNorm(v2f a)
+{
+    float square = normsq(a);
+    return invsqrt(square);
+}
+
+inline v2f normalize(v2f a)
+{
+    return scale(a, invNorm(a));
+}
+
+inline v2f normalizeScale(v2f v, float s)
+{
+    return scale(v, s*invNorm(v));
+}
+
+inline float projDist(v2f a, v2f b)
+{
+    return dot(a, normalize(b));
+}
+
+inline v2f perp(v2f a)
+{
+    v2f out = {a[1], -a[0]};
+    return out;
+}
+
+
+inline float rejDist(v2f a, v2f b)
+{
+    return fabs(dot(a, perp(normalize(b))));
 }
 
 v3f negative(v3f a)
@@ -219,19 +293,6 @@ v3f sub(v3f a, v3f b)
 {
     v3f sum = {a[0]-b[0],a[1]-b[1],a[2]-b[2]};
     return sum;
-}
-
-inline float32 invsqrt(float32 a)
-{
-    uint32 ai = *(uint32 *) &a;
-    union
-    {
-        uint32 isqrti;
-        float32 isqrt;
-    };
-    isqrti = 0x5f375a86 - (ai >> 1); //magic meth
-    isqrt *= (1.5f - (a*0.5f*isqrt*isqrt));
-    return isqrt;
 }
 
 inline float invNorm(v3f a)

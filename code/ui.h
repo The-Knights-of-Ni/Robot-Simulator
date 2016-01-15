@@ -191,7 +191,7 @@ virtual_joystick doVirtualJoystickNW(bool held, float x0, float y1, float width,
         joystick.y = clamp(2*((my-y0)/(y1-y0)-0.5), -1.0, 1.0);
     }
     
-    if(over) glUniform3f(ui_color, 1.0, 1.0, 1.0);
+    if(over||held) glUniform3f(ui_color, 1.0, 1.0, 1.0);
     else glUniform3f(ui_color, 0.5, 0.5, 0.5);
     glUniform2f(ui_uv0, 0, 0);
     glUniform2f(ui_uv1, 0, 0);
@@ -208,6 +208,6 @@ virtual_joystick doVirtualJoystickNW(bool held, float x0, float y1, float width,
     glUniform2f(ui_c1, (x1-x0)/2*joystick.x+(x0+x1)/2+dot_size*wx_scale, (y1-y0)/2*joystick.y+(y0+y1)/2+dot_size*wy_scale);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     
-    return {joystick, held};
+    return (virtual_joystick){joystick, held};
 }
 #endif

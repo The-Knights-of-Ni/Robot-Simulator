@@ -7,6 +7,7 @@
 #define min(a, b) (((a) < (b))?(a):(b))
 #define max(a, b) (((a) > (b))?(a):(b))
 #define clamp(a, low, high) (min(high, max(low, a)))
+#define lerp(a, b, t) ((a)*(1-t)+(b)*(t))
 
 typedef unsigned int uint;
 
