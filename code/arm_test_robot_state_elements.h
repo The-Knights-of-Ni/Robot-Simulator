@@ -10,6 +10,9 @@ static arm_state prs = {1.0, 0.0,
 
 float arm_winch_power = 0.0f;
 float arm_shoulder_power = 0.0f;
+float winch_encoder = 0.0f;
+float shoulder_encoder = 0.0f;
+float elbow_potentiometer = 0.0f;
 gamepad gamepad1 = {};
 gamepad gamepad2 = {};
 
@@ -94,6 +97,10 @@ void simulateAndRender()
     virtual_right_stick_held = virtual_right_stick.held;
     #endif
     ///////////////////////////////////////////
+    
+    shoulder_encoder = prs.shoulder_theta;
+    winch_encoder = prs.winch_theta;
+    elbow_potentiometer = pi+prs.forearm_theta-prs.shoulder_theta;
     
     //TODO: make it work for larger timesteps
     float dt = 0.0005;
