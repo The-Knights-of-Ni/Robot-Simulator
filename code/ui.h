@@ -156,6 +156,41 @@ bool doButtonNW(char * string, float x0, float y1, float x_padding, float y_padd
     return over && !left_click && prev_left_click;
 }
 
+bool doHoldButtonNW(char * string, float x0, float y1, float x_padding, float y_padding)
+{    
+    float width = getTextWidthInWindowUnits(string);            
+    
+    x_padding *= wx_scale;
+    y_padding *= wy_scale;
+    
+    int x;
+    int y;
+    SDL_GetMouseState(&x, &y);
+    float mx = x*wx_scale-1.0;
+    float my = -(y*wy_scale-1.0);
+    
+    float y0 = y1 - (stbtt_ScaleForPixelHeight(&font_info, 16)*wy_scale*(
+                          font_ascent -
+                          font_descent)+y_padding*2);
+    float x1 = x0+width+x_padding*2;
+    
+    glUniform1i(ui_mode, 0);
+    bool over = mx > x0 && mx < x1 && my > y0 && my < y1;
+    if(over) glUniform3f(ui_color, 1.0, 1.0, 1.0);
+    else glUniform3f(ui_color, 0.5, 0.5, 0.5);
+    glUniform2f(ui_uv0, 0, 0);
+    glUniform2f(ui_uv1, 0, 0);
+    glUniform2f(ui_c0, x0, y0);
+    glUniform2f(ui_c1, x1, y1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    
+    glUniform1i(ui_mode, 1);
+    glUniform3f(ui_color, 0.0, 0.0, 0.0);
+    drawText(x0+x_padding, y1-(stbtt_ScaleForPixelHeight(&font_info, 16)*wy_scale*font_ascent+y_padding), string);
+    
+    return over && left_click;
+}
+
 struct virtual_joystick
 {
     v2f joystick;

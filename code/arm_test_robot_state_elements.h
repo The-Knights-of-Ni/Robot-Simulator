@@ -96,6 +96,11 @@ void simulateAndRender()
     gamepad2.right_stick = virtual_right_stick.joystick;
     virtual_right_stick_held = virtual_right_stick.held;
     #endif
+    
+    x_pos = 0;
+    gamepad1.left_trigger = doHoldButtonNW("intake position", x_pos, 0.1, 4, 2);
+    x_pos += getTextWidthInWindowUnits("intake position")+(2*4)*wx_scale;
+    gamepad1.right_trigger = doHoldButtonNW("score position", x_pos, 0.1, 4, 2);
     ///////////////////////////////////////////
     
     shoulder_encoder = prs.shoulder_theta;
