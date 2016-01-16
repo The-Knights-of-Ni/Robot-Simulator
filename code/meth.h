@@ -192,6 +192,54 @@ inline float32 invsqrt(float32 a)
     return isqrt;
 }
 
+v2f operator+(v2f a, v2f b)
+{
+    v2f output;
+    output.x = a.x + b.x;
+    output.y = a.y + b.y;
+    return output;
+}
+
+v2f operator-(v2f a, v2f b)
+{
+    v2f output;
+    output.x = a.x - b.x;
+    output.y = a.y - b.y;
+    return output;
+}
+
+v2f operator*(v2f a, float b)
+{
+    v2f output;
+    output.x = a.x * b;
+    output.y = a.y * b;
+    return output;
+}
+
+v2f operator*(float b, v2f a)
+{
+    v2f output;
+    output.x = a.x * b;
+    output.y = a.y * b;
+    return output;
+}
+
+v2f operator/(v2f a, float b)//Shouldn't need other configuration, since it makes no sense
+{
+    v2f output;
+    output.x = a.x / b;
+    output.y = a.y / b;
+    return output;
+}
+
+v2f complexMultiply(v2f a, v2f b)
+{
+    v2f output;
+    output.x = a.x * b.x - a.y * b.y;
+    output.y = a.x * b.y + a.y * b.x;
+    return output;
+}
+
 inline v2f add(v2f a, v2f b)
 {
     v2f sum = {a[0]+b[0],
@@ -217,19 +265,19 @@ inline float dot(v2f a, v2f b)
     return a[0]*b[0]+a[1]*b[1];
 }
 
-inline float normsq(v2f a)
+inline float normSq(v2f a)
 {
     return dot(a, a);
 }
 
 inline float norm(v2f a)
 {
-    return sqrt(normsq(a));
+    return sqrt(normSq(a));
 }
 
 inline float invNorm(v2f a)
 {
-    float square = normsq(a);
+    float square = normSq(a);
     return invsqrt(square);
 }
 
@@ -258,6 +306,16 @@ inline v2f perp(v2f a)
 inline float rejDist(v2f a, v2f b)
 {
     return fabs(dot(a, perp(normalize(b))));
+}
+
+v2f project(v2f a, v2f b)
+{
+    return dot(a, b) / normSq(b) * b;
+}
+
+v2f reject(v2f a, v2f b)
+{
+    return a - project(a, b);
 }
 
 v3f negative(v3f a)

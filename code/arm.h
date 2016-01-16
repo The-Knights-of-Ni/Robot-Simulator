@@ -172,4 +172,168 @@ arm_derivatives getArmDerivatives(arm_state s, float shoulder_power, float winch
                                       s.winch_omega, winch_alpha};
     return out;
 }
+
+float armHeuristic(arm_state s, float shoulder_power, float winch_power,
+                   float target_shoulder_alpha, float target_winch_alpha)
+{
+    arm_derivatives d = getArmDerivatives(s, shoulder_power, winch_power);
+    //TODO: the actual robot code uses operator overloaded
+    //      vectors, should probably make the simulator match
+    
+    float heuristic = -sq(target_shoulder_alpha-d.shoulder_alpha)-sq(target_winch_alpha-d.winch_alpha);
+    return heuristic;
+}
+
+void armAtVelocity(v2f target_velocity, arm_state s, bool8 score_mode, float dt)
+{
+    float inside_elbow_theta = s.forearm_theta+(pi-s.shoulder_theta);
+    bool8 winch_mode = inside_elbow_theta < (acos((elbow_pulley_r-shoulder_pulley_r)/shoulder_length)+acos(elbow_pulley_r/forearm_length));
+    
+    ////////////////////////////////////////////////////
+    float string_moment_arm;
+    
+    if(winch_mode)
+    {
+        float shoudler_axis_to_end_sq = sq(forearm_length)+sq(shoulder_length)
+            -2*forearm_length*shoulder_length*cos(inside_elbow_theta);
+        
+        float string_theta = s.shoulder_theta
+            -asin(forearm_length/sqrt(shoudler_axis_to_end_sq)*sin(inside_elbow_theta))
+            +asin(shoulder_pulley_r/sqrt(shoudler_axis_to_end_sq));
+        
+        string_moment_arm = forearm_length*sin(string_theta-s.forearm_theta);
+    }
+    else
+    {
+        string_moment_arm = elbow_pulley_r;
+    }
+    
+    float target_forearm_omega;
+    float target_shoulder_omega;
+    
+    //TODO: fix divides by zero
+    if(score_mode)
+    {
+        if(inside_elbow_theta < pi-0.1)
+        {
+            target_forearm_omega =
+                (target_velocity.x/sin(s.shoulder_theta)+target_velocity.y/cos(s.shoulder_theta))
+                /(forearm_length*(-sin(s.forearm_theta)/sin(s.shoulder_theta)+cos(s.forearm_theta)/cos(s.shoulder_theta)));
+            target_shoulder_omega =
+                (target_velocity.x/sin(s.forearm_theta)+target_velocity.y/cos(s.forearm_theta))
+                /(shoulder_length*(-sin(s.shoulder_theta)/sin(s.forearm_theta)+cos(s.shoulder_theta)/cos(s.forearm_theta)));
+        }
+        else
+        {
+            target_forearm_omega =
+                -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
+            target_shoulder_omega =
+                -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
+            target_forearm_omega -= 10;
+            target_shoulder_omega += 0;
+        }
+    }
+    else
+    {
+        if(inside_elbow_theta > pi+0.1)
+        {
+            target_forearm_omega =
+                (target_velocity.x/sin(s.shoulder_theta)+target_velocity.y/cos(s.shoulder_theta))
+                /(forearm_length*(-sin(s.forearm_theta)/sin(s.shoulder_theta)+cos(s.forearm_theta)/cos(s.shoulder_theta)));
+            target_shoulder_omega =
+                (target_velocity.x/sin(s.forearm_theta)+target_velocity.y/cos(s.forearm_theta))
+                /(shoulder_length*(-sin(s.shoulder_theta)/sin(s.forearm_theta)+cos(s.shoulder_theta)/cos(s.forearm_theta)));
+        }
+        else
+        {
+            target_forearm_omega =
+                -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
+            target_shoulder_omega =
+                -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
+            target_forearm_omega += 10;
+            target_shoulder_omega -= 10;
+        }
+    }
+    
+    arm_winch_power =
+        winch_gear_ratio/neverest_max_speed
+        *((target_forearm_omega-target_shoulder_omega)*string_moment_arm/winch_pulley_r
+          +target_shoulder_omega);
+    arm_shoulder_power =
+        shoulder_gear_ratio/neverest_max_speed
+        *target_shoulder_omega;
+    
+    //clamp while keeping ratio constant
+    if(arm_winch_power > 1.0)
+    {
+        arm_shoulder_power *= 1.0/arm_winch_power;
+        arm_winch_power = 1.0;
+    }
+    if(arm_winch_power < -1.0)
+    {
+        arm_shoulder_power *= -1.0/arm_winch_power;
+        arm_winch_power = -1.0;
+    }
+    if(arm_shoulder_power > 1.0)
+    {
+        arm_winch_power *= 1.0/arm_shoulder_power;
+        arm_shoulder_power = 1.0;
+    }
+    if(arm_shoulder_power < -1.0)
+    {
+        arm_winch_power *= -1.0/arm_shoulder_power;
+        arm_shoulder_power = -1.0;
+    }
+}
+
+void armToState(arm_state stable_s, arm_state s, bool8 score_mode, float dt)
+{
+    if(!score_mode)
+    {
+        float target_shoulder_alpha = 0.0;//-10000*s.shoulder_omega+2000*(stable_s.shoulder_theta-s.shoulder_theta);
+        float target_winch_alpha = 0.0;//-10000*s.forearm_omega+10*(stable_s.winch_theta-s.winch_theta);
+        
+        float winch_power_step = 0.1;
+        float shoulder_power_step = 0.1;
+        
+        float best_heuristic;
+        float best_shoulder_power;
+        float best_winch_power;
+        {
+            float shoulder_power = 0.0;
+            float winch_power = 0.0;
+            
+            float heuristic = armHeuristic(s, shoulder_power, winch_power, target_shoulder_alpha, target_winch_alpha);
+            
+            best_heuristic = heuristic;
+            best_shoulder_power = shoulder_power;
+            best_winch_power = arm_winch_power;
+        }
+        
+        //TODO: this is really SIMDable/multithreadable
+        for(float winch_power = -1.0; winch_power < 1.0; winch_power += winch_power_step)
+        {
+            for(float shoulder_power = -1.0; shoulder_power < 1.0; shoulder_power += shoulder_power_step)
+            {
+                float heuristic = armHeuristic(s, shoulder_power, winch_power, target_shoulder_alpha, target_winch_alpha);
+                if(heuristic > best_heuristic)
+                {
+                    best_heuristic = heuristic;
+                    best_shoulder_power = shoulder_power;
+                    best_winch_power = winch_power;
+                }
+            }
+        }
+        arm_shoulder_power = lerp(best_shoulder_power, arm_shoulder_power, exp(-100*dt));
+        arm_winch_power = lerp(best_winch_power, arm_winch_power, exp(-100*dt));
+        
+        arm_shoulder_power += 5*(stable_s.shoulder_theta-s.shoulder_theta);//-s.shoulder_omega;
+        arm_winch_power += 1*(stable_s.winch_theta-s.winch_theta);//-s.winch_omega;
+    }
+    else
+    {
+        arm_winch_power = 10*(stable_s.winch_theta-s.winch_theta);
+        arm_shoulder_power = 50*(stable_s.shoulder_theta-s.shoulder_theta);
+    }
+}
 #endif

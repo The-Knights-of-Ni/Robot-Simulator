@@ -6,6 +6,7 @@
 #include "renderer.h"
 
 #include "arm_test.h" //TODO: this should be loaded from a dll
+#include "arm_simulate.h" //TODO: this should be loaded from a dll
 
 void APIENTRY glErrorCallback(GLenum source, GLenum type, uint id, GLenum severity, GLsizei length, const char * message, void * userParam)
 {
