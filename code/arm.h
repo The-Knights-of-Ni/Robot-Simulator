@@ -214,9 +214,8 @@ float armHeuristic(arm_state s, float shoulder_power, float winch_power,
     return heuristic;
 }
 
-void armAtVelocity(float & out_shoulder_power, float & out_winch_power, v2f target_velocity, arm_state s, bool8 score_mode, float dt)
+void armAtVelocity(float & out_shoulder_power, float & out_winch_power, v2f target_velocity, float inside_elbow_theta, bool8 score_mode, float dt)
 {
-    float inside_elbow_theta = s.forearm_theta+(pi-s.shoulder_theta);
     bool8 winch_mode = inside_elbow_theta < (acos((elbow_pulley_r-shoulder_pulley_r)/shoulder_length)+acos(elbow_pulley_r/forearm_length));
     
     ////////////////////////////////////////////////////
@@ -227,69 +226,67 @@ void armAtVelocity(float & out_shoulder_power, float & out_winch_power, v2f targ
         float shoudler_axis_to_end_sq = sq(forearm_length)+sq(shoulder_length)
             -2*forearm_length*shoulder_length*cos(inside_elbow_theta);
         
-        float string_theta = s.shoulder_theta
+        float string_theta =
             -asin(forearm_length/sqrt(shoudler_axis_to_end_sq)*sin(inside_elbow_theta))
             +asin(shoulder_pulley_r/sqrt(shoudler_axis_to_end_sq));
         
-        string_moment_arm = forearm_length*sin(string_theta-s.forearm_theta);
+        string_moment_arm = forearm_length*sin(string_theta);
     }
     else
     {
         string_moment_arm = elbow_pulley_r;
     }
     
-    float target_forearm_omega;
+    float target_winch_omega;
     float target_shoulder_omega;
     
     //TODO: fix divides by zero
     if(score_mode)
     {
+        target_winch_omega = target_velocity.x;
+        
+        float inside_elbow_omega = target_winch_omega*winch_pulley_r/string_moment_arm;
+        
+        float shoudler_axis_to_end_sq = sq(forearm_length)+sq(shoulder_length)
+            -2*forearm_length*shoulder_length*cos(inside_elbow_theta);
+        float dshoudler_axis_to_end_sq =
+            -2.0*forearm_length*shoulder_length*sin(inside_elbow_theta)*inside_elbow_omega;
+        
+        target_shoulder_omega =
+            target_velocity.y
+            -invSqrt(1-sq(forearm_length/sqrt(shoudler_axis_to_end_sq)*sin(inside_elbow_theta)))
+            *(
+                forearm_length/sqrt(shoudler_axis_to_end_sq)*cos(inside_elbow_theta)*inside_elbow_omega
+                *forearm_length*pow(shoudler_axis_to_end_sq, -3.0/2.0)*dshoudler_axis_to_end_sq*sin(inside_elbow_theta));
+        
         if(inside_elbow_theta < pi-0.25)
         {
-            target_forearm_omega =
-                (target_velocity.x/sin(s.shoulder_theta)+target_velocity.y/cos(s.shoulder_theta))
-                /(forearm_length*(-sin(s.forearm_theta)/sin(s.shoulder_theta)+cos(s.forearm_theta)/cos(s.shoulder_theta)));
-            target_shoulder_omega =
-                (target_velocity.x/sin(s.forearm_theta)+target_velocity.y/cos(s.forearm_theta))
-                /(shoulder_length*(-sin(s.shoulder_theta)/sin(s.forearm_theta)+cos(s.shoulder_theta)/cos(s.forearm_theta)));
         }
         else
         {
-            target_forearm_omega =
-                -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
-            target_shoulder_omega =
-                -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
-            if(target_forearm_omega > 0) target_forearm_omega *= -1;
-            target_forearm_omega -= 1000;
+            if(target_winch_omega > 0) target_winch_omega *= -1;
+            target_winch_omega -= 1000;
             target_shoulder_omega += 0;
         }
     }
     else
     {
+        target_winch_omega = -(target_velocity.x*string_moment_arm/winch_pulley_r);
+        target_shoulder_omega = target_velocity.y;
+        
         if(inside_elbow_theta > pi+0.1)
         {
-            target_forearm_omega =
-                (target_velocity.x/sin(s.shoulder_theta)+target_velocity.y/cos(s.shoulder_theta))
-                /(forearm_length*(-sin(s.forearm_theta)/sin(s.shoulder_theta)+cos(s.forearm_theta)/cos(s.shoulder_theta)));
-            target_shoulder_omega =
-                (target_velocity.x/sin(s.forearm_theta)+target_velocity.y/cos(s.forearm_theta))
-                /(shoulder_length*(-sin(s.shoulder_theta)/sin(s.forearm_theta)+cos(s.shoulder_theta)/cos(s.forearm_theta)));
         }
         else
         {
-            target_forearm_omega =
-                -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
-            target_shoulder_omega =
-                -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
-            target_forearm_omega += 10;
+            target_winch_omega += 10;
             target_shoulder_omega -= 10;
         }
     }
     
     out_winch_power =
         winch_gear_ratio/neverest_max_speed
-        *((target_forearm_omega-target_shoulder_omega)*string_moment_arm/winch_pulley_r
-          +target_shoulder_omega);
+        *(target_winch_omega+target_shoulder_omega);
     out_shoulder_power =
         shoulder_gear_ratio/neverest_max_speed
         *target_shoulder_omega;
@@ -317,20 +314,10 @@ void armAtVelocity(float & out_shoulder_power, float & out_winch_power, v2f targ
     }
 }
 
-void armToState(float & out_shoulder_power, float & out_winch_power, arm_state stable_s, arm_state s, bool8 score_mode, float dt)
+void armToState(float & out_shoulder_power, float & out_winch_power, float target_shoulder_theta, float target_inside_elbow_theta, float shoulder_theta, float inside_elbow_theta, bool8 score_mode, float dt)
 {
-    if(false && !score_mode)
-    {
-        if(stable_s.forearm_theta < stable_s.shoulder_theta) stable_s.forearm_theta = stable_s.shoulder_theta+10.25;
-        
-        out_shoulder_power += 50*(stable_s.shoulder_theta-s.shoulder_theta);//-s.shoulder_omega;
-        out_winch_power += 10*(stable_s.winch_theta-s.winch_theta);//-s.winch_omega;
-    }
-    else
-    {   
-        out_shoulder_power = 100*0.5*(stable_s.shoulder_theta-s.shoulder_theta);
-        out_winch_power = 100*0.1*(stable_s.forearm_theta-s.forearm_theta);//-10*s.winch_omega;
-    }
+    out_shoulder_power = 100*0.5*(target_shoulder_theta-shoulder_theta);
+    out_winch_power = 100*0.1*(target_inside_elbow_theta-inside_elbow_theta);//-10*s.winch_omega;
 }
 
 /*

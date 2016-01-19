@@ -6,7 +6,7 @@
 #include "Button.h"
 
 static arm_state prs = {1.0, 0.0,
-                        0.0, 0.0,
+                        -1.0, 0.0,
                         0.0, 0.0,};
 
 float play = 0;
@@ -117,7 +117,7 @@ void simulateAndRender()
     
     
     //TODO: make it work for larger timesteps
-    float dt = 0.00075;
+    float dt = 0.001;
     
     time += dt;
     

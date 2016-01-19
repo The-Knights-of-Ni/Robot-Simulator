@@ -68,7 +68,7 @@ float hand_level_position = 0.6;
 //Arm
 #define shoulder_manual pad2stick1
 #define elbow_manual pad2stick2
-#define arm_stick pad2stick1
+#define arm_stick ((v2f){pad2stick1.y,pad2stick2.y})
 #define arm_manual_toggle pad2.toggle(DPAD_UP)
 #define arm_intake_mode_button (gamepad2.left_trigger > 0.5)
 #define arm_score_mode_button (gamepad2.right_trigger > 0.5)
@@ -86,9 +86,13 @@ v2f pad1stick2;
 v2f pad2stick1;
 v2f pad2stick2;
     
-arm_state s = {};
-arm_state stable_s = {};
+float inside_elbow_theta;
+float shoulder_theta;
 bool8 score_mode = true;
+float shoulder_omega;
+
+float target_shoulder_theta;
+float target_inside_elbow_theta;
 
 float dt;
 float old_time = time;
@@ -97,9 +101,8 @@ float elbow_potentiometer_angle = 0.0;
 
 //just because the simulator doesn't prefectly treat it like real code yet
 void simulatorStartMain(){
-    stable_s.shoulder_theta = pi/2;
-    stable_s.forearm_theta = 0;
-    stable_s.winch_theta = 0;
+    target_shoulder_theta = pi*150/180;
+    target_inside_elbow_theta = pi/2;
 }
 
 extern "C"
@@ -142,50 +145,43 @@ void JNI_main(JNIEnv * _env, jobject _self)
             exp(-20.0*dt));
         
         float new_shoulder_theta = shoulder_encoder/shoulder_gear_ratio/encoder_ticks_per_radian+pi*150/180.0;
-        float new_forearm_theta = elbow_potentiometer_angle+new_shoulder_theta-pi;
-        float new_winch_theta = winch_encoder/winch_gear_ratio/encoder_ticks_per_radian;
-        s.shoulder_omega = lerp((new_shoulder_theta-s.shoulder_theta)/dt, s.shoulder_omega, exp(-0.1*dt));
-        s.forearm_omega = lerp((new_forearm_theta-s.forearm_theta)/dt, s.forearm_omega, exp(-0.1*dt));
-        s.winch_omega = lerp((new_winch_theta-s.winch_theta)/dt, s.winch_omega, exp(-0.1*dt));
+        float new_inside_elbow_theta = elbow_potentiometer_angle;
+        shoulder_omega = lerp((new_shoulder_theta-shoulder_theta)/dt, shoulder_omega, exp(-0.1*dt));
+        float inside_elbow_omega = (new_inside_elbow_theta-inside_elbow_omega)/dt;
         
         shoulder_print_theta = new_shoulder_theta;
-        forearm_print_theta = new_forearm_theta;
+        forearm_print_theta = new_inside_elbow_theta;
         
-        s.shoulder_theta = new_shoulder_theta;
-        s.forearm_theta = new_forearm_theta;
-        s.winch_theta = new_winch_theta;
-
-        if(stable_s.forearm_theta > stable_s.shoulder_theta-0.25) stable_s.forearm_theta = stable_s.shoulder_theta-0.25;
-        if(arm_manual_toggle) //IK
-        {
-            
+        shoulder_theta = new_shoulder_theta;
+        inside_elbow_theta = new_inside_elbow_theta;
+        
+        if(true | arm_manual_toggle) //IK
+        {            
             //deadZone(arm_stick);
             v2f target_arm_velocity = arm_stick*40;
                         
             if(arm_intake_mode_button)
             {
                 score_mode = false;
-                stable_s.shoulder_theta = 2.75;
-                stable_s.forearm_theta = pi;
-                stable_s.winch_theta = 5.5;
+                target_shoulder_theta = 2.75;
+                target_inside_elbow_theta = pi;
             }
             if(arm_score_mode_button)
             {
                 score_mode = true;
-                stable_s.shoulder_theta = 0.75;
-                stable_s.forearm_theta = 0;
-                stable_s.winch_theta = 1;
+                target_shoulder_theta = 0.75;
+                target_inside_elbow_theta = pi*2/3;
             }
             
             if(normSq(target_arm_velocity) > 1.0)
             {
-                stable_s = s;
-                stable_s.shoulder_theta = clamp(stable_s.shoulder_theta, pi/6, 5*pi/6);
-                armAtVelocity(shoulder, winch, target_arm_velocity, s, score_mode, dt);
+                target_shoulder_theta = shoulder_theta;
+                target_inside_elbow_theta = inside_elbow_theta;
+                armAtVelocity(shoulder, winch, target_arm_velocity, inside_elbow_theta, score_mode, dt);
             }
             else
             {
-                armToState(shoulder, winch, stable_s, s, score_mode, dt);
+                armToState(shoulder, winch, target_shoulder_theta, target_inside_elbow_theta, shoulder_theta, inside_elbow_theta, score_mode, dt);
             }
             
             shoulder = clamp(shoulder, -1.0, 1.0);
@@ -193,8 +189,8 @@ void JNI_main(JNIEnv * _env, jobject _self)
         }
         else //Manual
         {
-            stable_s = s;
-            stable_s.shoulder_theta = clamp(stable_s.shoulder_theta, pi/6, 5*pi/6);
+            target_shoulder_theta = shoulder_theta;
+            target_inside_elbow_theta = inside_elbow_theta;
             
             deadZone(elbow_manual);
             deadZone(shoulder_manual);
