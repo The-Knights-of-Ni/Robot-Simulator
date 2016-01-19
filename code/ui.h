@@ -158,7 +158,7 @@ bool doButtonNW(char * string, float x0, float y1, float x_padding, float y_padd
 
 bool doHoldButtonNW(char * string, float x0, float y1, float x_padding, float y_padding)
 {    
-    float width = getTextWidthInWindowUnits(string);            
+    float width = getTextWidthInWindowUnits(string);
     
     x_padding *= wx_scale;
     y_padding *= wy_scale;

@@ -18,8 +18,8 @@ float shoulder_gear_ratio = 6.75;
 float forearm_I = 81.0f*20; //the rotational inertia of the forearm
 float forearm_m = 200.0f;
 
-float forearm_length = 17.0f;
-float forearm_cm_dist = 9.0f;
+float forearm_length = 11.5f;
+float forearm_cm_dist = 6.0f;
 float shoulder_length = 16.5f;
 float shoulder_cm_dist = 9.0f;
 
@@ -35,7 +35,7 @@ float neverest_max_speed = 13.51; //in rad/s
 float neverest_k_i = dc_motor_voltage/neverest_max_speed;
 float neverest_k_t_over_R = neverest_max_torque/dc_motor_voltage;
 
-float string_length_0 = 29.908846+1;
+float string_length_0 = 7;
 
 union arm_derivatives
 {
@@ -79,8 +79,7 @@ arm_derivatives getArmDerivatives(arm_state s, float shoulder_power, float winch
     
     bool8 winch_mode = inside_elbow_theta < (acos((elbow_pulley_r-shoulder_pulley_r)/shoulder_length)+acos(elbow_pulley_r/forearm_length));
     if(winch_mode)
-    {   
-        doButtonNW("winch mode", 0.0, 0.5, 4, 2);
+    {
         float shoudler_axis_to_end_sq = sq(forearm_length)+sq(shoulder_length)
             -2*forearm_length*shoulder_length*cos(inside_elbow_theta);
         
@@ -96,11 +95,7 @@ arm_derivatives getArmDerivatives(arm_state s, float shoulder_power, float winch
         string_moment_arm = (forearm_length-forearm_cm_dist)*sin(string_theta-s.forearm_theta);
     }
     else
-    {        
-        if(doButtonNW("not winch mode", 0.0, 0.5, 4, 2))
-        {
-            s.forearm_theta = -1.0;
-        }
+    {
         //TODO: I'm not sure if this works when elbow_pulley_r < shoulder_pulley_r
         //      might need to add or subtract 2*pi or something
         string_theta = s.shoulder_theta-asin((elbow_pulley_r-shoulder_pulley_r)/shoulder_length);
@@ -118,7 +113,6 @@ arm_derivatives getArmDerivatives(arm_state s, float shoulder_power, float winch
     if(string_tension < 0)
     {
         string_tension = 0;
-        doButtonNW("string not engaged", 0.0, 0.0, 4, 2);
     }
     
     float shoulder_motor_voltage = (shoulder_power*dc_motor_voltage - neverest_k_i*s.shoulder_omega*shoulder_gear_ratio);
@@ -199,8 +193,8 @@ arm_derivatives getArmDerivatives(arm_state s, float shoulder_power, float winch
     float winch_motor_voltage = (winch_power*dc_motor_voltage - neverest_k_i*s.winch_omega*winch_gear_ratio);
     float winch_motor_tau = winch_motor_voltage*neverest_k_t_over_R*2*winch_gear_ratio;
     float winch_tau = winch_motor_tau+string_tension*winch_pulley_r
-        -(s.winch_omega>0.1 ? 100000 :
-          (s.winch_omega<-0.1 ?-100000 : 0));
+        -(s.winch_omega>0.1 ? 1000000 :
+          (s.winch_omega<-0.1 ?-1000000 : 0));
     float winch_alpha = winch_tau/winch_I;
     
     arm_derivatives out = {s.shoulder_omega, shoulder_alpha,
@@ -220,7 +214,7 @@ float armHeuristic(arm_state s, float shoulder_power, float winch_power,
     return heuristic;
 }
 
-void armAtVelocity(v2f target_velocity, arm_state s, bool8 score_mode, float dt)
+void armAtVelocity(float & out_shoulder_power, float & out_winch_power, v2f target_velocity, arm_state s, bool8 score_mode, float dt)
 {
     float inside_elbow_theta = s.forearm_theta+(pi-s.shoulder_theta);
     bool8 winch_mode = inside_elbow_theta < (acos((elbow_pulley_r-shoulder_pulley_r)/shoulder_length)+acos(elbow_pulley_r/forearm_length));
@@ -250,7 +244,7 @@ void armAtVelocity(v2f target_velocity, arm_state s, bool8 score_mode, float dt)
     //TODO: fix divides by zero
     if(score_mode)
     {
-        if(inside_elbow_theta < pi-0.1)
+        if(inside_elbow_theta < pi-0.25)
         {
             target_forearm_omega =
                 (target_velocity.x/sin(s.shoulder_theta)+target_velocity.y/cos(s.shoulder_theta))
@@ -265,7 +259,8 @@ void armAtVelocity(v2f target_velocity, arm_state s, bool8 score_mode, float dt)
                 -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
             target_shoulder_omega =
                 -target_velocity.x*sin(s.shoulder_theta)+target_velocity.y*cos(s.shoulder_theta);
-            target_forearm_omega -= 10;
+            if(target_forearm_omega > 0) target_forearm_omega *= -1;
+            target_forearm_omega -= 1000;
             target_shoulder_omega += 0;
         }
     }
@@ -291,85 +286,134 @@ void armAtVelocity(v2f target_velocity, arm_state s, bool8 score_mode, float dt)
         }
     }
     
-    arm_winch_power =
+    out_winch_power =
         winch_gear_ratio/neverest_max_speed
         *((target_forearm_omega-target_shoulder_omega)*string_moment_arm/winch_pulley_r
           +target_shoulder_omega);
-    arm_shoulder_power =
+    out_shoulder_power =
         shoulder_gear_ratio/neverest_max_speed
         *target_shoulder_omega;
     
     //clamp while keeping ratio constant
-    if(arm_winch_power > 1.0)
+    if(out_winch_power > 1.0)
     {
-        arm_shoulder_power *= 1.0/arm_winch_power;
-        arm_winch_power = 1.0;
+        out_shoulder_power *= 1.0/out_winch_power;
+        out_winch_power = 1.0;
     }
-    if(arm_winch_power < -1.0)
+    if(out_winch_power < -1.0)
     {
-        arm_shoulder_power *= -1.0/arm_winch_power;
-        arm_winch_power = -1.0;
+        out_shoulder_power *= -1.0/out_winch_power;
+        out_winch_power = -1.0;
     }
-    if(arm_shoulder_power > 1.0)
+    if(out_shoulder_power > 1.0)
     {
-        arm_winch_power *= 1.0/arm_shoulder_power;
-        arm_shoulder_power = 1.0;
+        out_winch_power *= 1.0/out_shoulder_power;
+        out_shoulder_power = 1.0;
     }
-    if(arm_shoulder_power < -1.0)
+    if(out_shoulder_power < -1.0)
     {
-        arm_winch_power *= -1.0/arm_shoulder_power;
-        arm_shoulder_power = -1.0;
+        out_winch_power *= -1.0/out_shoulder_power;
+        out_shoulder_power = -1.0;
     }
 }
 
-void armToState(arm_state stable_s, arm_state s, bool8 score_mode, float dt)
+void armToState(float & out_shoulder_power, float & out_winch_power, arm_state stable_s, arm_state s, bool8 score_mode, float dt)
 {
-    if(!score_mode)
+    if(false && !score_mode)
     {
-        float target_shoulder_alpha = 0.0;//-10000*s.shoulder_omega+2000*(stable_s.shoulder_theta-s.shoulder_theta);
-        float target_winch_alpha = 0.0;//-10000*s.forearm_omega+10*(stable_s.winch_theta-s.winch_theta);
+        if(stable_s.forearm_theta < stable_s.shoulder_theta) stable_s.forearm_theta = stable_s.shoulder_theta+10.25;
         
-        float winch_power_step = 0.1;
-        float shoulder_power_step = 0.1;
-        
-        float best_heuristic;
-        float best_shoulder_power;
-        float best_winch_power;
-        {
-            float shoulder_power = 0.0;
-            float winch_power = 0.0;
-            
-            float heuristic = armHeuristic(s, shoulder_power, winch_power, target_shoulder_alpha, target_winch_alpha);
-            
-            best_heuristic = heuristic;
-            best_shoulder_power = shoulder_power;
-            best_winch_power = arm_winch_power;
-        }
-        
-        //TODO: this is really SIMDable/multithreadable
-        for(float winch_power = -1.0; winch_power < 1.0; winch_power += winch_power_step)
-        {
-            for(float shoulder_power = -1.0; shoulder_power < 1.0; shoulder_power += shoulder_power_step)
-            {
-                float heuristic = armHeuristic(s, shoulder_power, winch_power, target_shoulder_alpha, target_winch_alpha);
-                if(heuristic > best_heuristic)
-                {
-                    best_heuristic = heuristic;
-                    best_shoulder_power = shoulder_power;
-                    best_winch_power = winch_power;
-                }
-            }
-        }
-        arm_shoulder_power = lerp(best_shoulder_power, arm_shoulder_power, exp(-100*dt));
-        arm_winch_power = lerp(best_winch_power, arm_winch_power, exp(-100*dt));
-        
-        arm_shoulder_power += 5*(stable_s.shoulder_theta-s.shoulder_theta);//-s.shoulder_omega;
-        arm_winch_power += 1*(stable_s.winch_theta-s.winch_theta);//-s.winch_omega;
+        out_shoulder_power += 50*(stable_s.shoulder_theta-s.shoulder_theta);//-s.shoulder_omega;
+        out_winch_power += 10*(stable_s.winch_theta-s.winch_theta);//-s.winch_omega;
     }
     else
-    {
-        arm_winch_power = 10*(stable_s.winch_theta-s.winch_theta);
-        arm_shoulder_power = 50*(stable_s.shoulder_theta-s.shoulder_theta);
+    {   
+        out_shoulder_power = 100*0.5*(stable_s.shoulder_theta-s.shoulder_theta);
+        out_winch_power = 100*0.1*(stable_s.forearm_theta-s.forearm_theta);//-10*s.winch_omega;
     }
+}
+
+/*
+inputs: hand[0] and hand[1] are the coordinates of the wanted hand position in inches, relative to the robot
+hand will be clamped if it is outside of the range of motion of the arm
+*/
+v2f getArmTargetsRectangular(v2f hand, bool mode)
+{
+    v2f arm_targets; //0 -> shoulder, 1 -> elbow
+
+    float dist = norm(hand);
+    //clamp hand motion
+    if (dist > forearm_length + shoulder_length)
+    {
+        hand * ((0.9 * (forearm_length + shoulder_length)) * invSqrt(dist));
+    }
+    if (dist < forearm_length - shoulder_length)
+    {
+        hand * ((0.9 * (forearm_length - shoulder_length)) * invSqrt(dist));
+    }
+    //TODO: clamp when the arm will hit the frame
+
+    arm_targets[0] = atan2(hand[1], hand[0]);
+    if (arm_targets[0] < 0.0f)
+        arm_targets[0] += 2.0f * pi;
+
+    float shoulder_offset = acos((sq(shoulder_length) + sq(dist) - sq(forearm_length)) / (2.0f * dist * shoulder_length));
+    //from law of cosines, forearm_length^2 = shoulder_length^2 + dist^2 - 2*dist*shoulder_length*cos(shoulder_offset)
+
+    arm_targets[1] = acos(
+            (sq(shoulder_length) + sq(forearm_length) - sq(dist)) / (2.0f * shoulder_length * forearm_length));
+    if (mode)//shoulder_target < shoulder_max)
+    { //pulley case
+
+        arm_targets[0] = arm_targets[0] - shoulder_offset;
+        arm_targets[1] = 2.0f * pi - arm_targets[1];
+    }
+    else
+    { //winch case
+        arm_targets[0] = arm_targets[0] + shoulder_offset;
+    }
+    /*
+      outputs: arm_target[1] and arm_targets[0] are the rotations of
+      the elbow(from the potentiometer) and shoulder outputs in radians, respectively
+    */
+    return arm_targets;
+}
+
+/*
+inputs: hand[0] and hand[1] are the polar coordinates of the wanted hand position in inches and radians, relative to the robot
+ hand will be clamped if it is outside of the range of motion of the arm
+*/
+v2f getArmTargetsPolar(v2f hand, bool mode)
+{
+    v2f arm_targets; //[0] -> shoulder, [1] -> elbow
+
+    //clamp hand motion
+    if (hand[0] > forearm_length + shoulder_length)
+        hand[0] = forearm_length + shoulder_length;
+    if (hand[0] < fabs(forearm_length - shoulder_length))
+        hand[0] = fabs(forearm_length - shoulder_length);
+    float dist = hand[0];
+    //TODO: clamp when the arm will hit the frame
+
+    float shoulder_offset = acos(
+            (sq(shoulder_length) + sq(dist) - sq(forearm_length)) / (2.0f * dist * shoulder_length));
+    //from law of cosines, forearm_length^2 = shoulder_length^2 + dist^2 - 2*dist*shoulder_length*cos(shoulder_offset)
+
+    arm_targets[1] = acos((sq(shoulder_length) + sq(forearm_length) - sq(dist)) / (2.0f * shoulder_length * forearm_length));
+    if (mode)//shoulder_target < shoulder_max)
+    { //pulley case
+        arm_targets[0] = hand[1] - shoulder_offset;
+        arm_targets[1] = 2.0f * pi- arm_targets[1];
+    }
+    else
+    { //winch case
+        arm_targets[0] = hand[1] + shoulder_offset;
+    }
+
+    /*
+      outputs: arm_targets[1] and arm_targets[0] are the rotations of
+      the elbow(from the potentiometer) and shoulder outputs in radians, respectively
+    */
+    return arm_targets;
 }
 #endif

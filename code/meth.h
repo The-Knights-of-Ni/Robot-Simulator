@@ -179,7 +179,7 @@ struct m4x5f
 };
 #pragma pack(pop)
 
-inline float32 invsqrt(float32 a)
+inline float32 invSqrt(float32 a)
 {
     uint32 ai = *(uint32 *) &a;
     union
@@ -278,7 +278,7 @@ inline float norm(v2f a)
 inline float invNorm(v2f a)
 {
     float square = normSq(a);
-    return invsqrt(square);
+    return invSqrt(square);
 }
 
 inline v2f normalize(v2f a)
@@ -356,7 +356,7 @@ v3f sub(v3f a, v3f b)
 inline float invNorm(v3f a)
 {
     float square = dot(a, a);
-    return invsqrt(square);
+    return invSqrt(square);
 }
 
 inline v3f normalize(v3f a)

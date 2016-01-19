@@ -3,6 +3,7 @@
 
 //#include "arm_robot_state_elements.h"
 #include "arm.h"
+#include "Button.h"
 
 static arm_state prs = {1.0, 0.0,
                         0.0, 0.0,
@@ -26,11 +27,12 @@ arm_state linear_integrate(arm_state s, arm_derivatives d, float dt)
 arm_derivatives evaluate(arm_state s, arm_derivatives d, float dt)
 {
     s = linear_integrate(s, d, dt);
-    arm_derivatives o = getArmDerivatives(s, arm_shoulder_power, arm_winch_power);
+    arm_derivatives o = getArmDerivatives(s, shoulder, winch);
     return o;
 }
 
 bool virtual_right_stick_held = false;
+bool virtual_left_stick_held = false;
 void simulateAndRender()
 {
     ////////////////Control Map////////////////
@@ -68,24 +70,56 @@ void simulateAndRender()
     {
         gamepad2.right_stick.y = -1.0;
     }
-    #else    
+    #else
     virtual_joystick virtual_right_stick = doVirtualJoystickNW(virtual_right_stick_held, 0.5, -0.5, 100, 100);
-    gamepad2.right_stick = virtual_right_stick.joystick;
+    gamepad2.joystick2 = virtual_right_stick.joystick;
     virtual_right_stick_held = virtual_right_stick.held;
+
+    virtual_joystick virtual_left_stick = doVirtualJoystickNW(virtual_left_stick_held, -0.5, -0.5, 100, 100);
+    gamepad2.joystick1 = virtual_left_stick.joystick;
+    virtual_left_stick_held = virtual_left_stick.held;
     #endif
     
-    x_pos = 0;
-    gamepad1.left_trigger = doHoldButtonNW("intake position", x_pos, 0.1, 4, 2);
+    x_pos = -0.5;
+    gamepad2.left_trigger = doHoldButtonNW("intake position", x_pos, -0.3, 4, 2);
     x_pos += getTextWidthInWindowUnits("intake position")+(2*4)*wx_scale;
-    gamepad1.right_trigger = doHoldButtonNW("score position", x_pos, 0.1, 4, 2);
+    gamepad2.right_trigger = doHoldButtonNW("score position", x_pos, -0.3, 4, 2);
+    x_pos += getTextWidthInWindowUnits("score position")+(2*4)*wx_scale;
+    gamepad2.buttons |= (doHoldButtonNW("manual control", x_pos, -0.3, 4, 2) << DPAD_UP);
+    x_pos += getTextWidthInWindowUnits("manual control")+(2*4)*wx_scale;
+    gamepad2.buttons |= (doHoldButtonNW("slow model", x_pos, -0.3, 4, 2) << A);
+    
     ///////////////////////////////////////////
     
-    shoulder_encoder = prs.shoulder_theta;
-    winch_encoder = prs.winch_theta;
-    elbow_potentiometer = pi+prs.forearm_theta-prs.shoulder_theta;
+    float potentiometer_range = 333.33333333333333333333333333333333333f;
+    
+    shoulder_encoder = (prs.shoulder_theta-pi*150.0/180.0)*shoulder_gear_ratio*encoder_ticks_per_radian;
+    winch_encoder = prs.winch_theta*winch_gear_ratio*encoder_ticks_per_radian;
+    elbow_potentiometer = ((-180+potentiometer_range*0.5-(((pi+prs.forearm_theta-prs.shoulder_theta)*180.0/pi)-360)-12)/potentiometer_range)*1023;
+
+    x_pos = -1;
+
+    char * time_string = (char *) malloc(100);
+    sprintf(time_string, "time %f", time);
+    doHoldButtonNW(time_string, x_pos, 0.2, 4, 2);
+    
+    char * potentiometer_string = (char *) malloc(100);
+    sprintf(potentiometer_string, "elbow_potentiometer %d", elbow_potentiometer);
+    doHoldButtonNW(potentiometer_string, x_pos, 0.1, 4, 2);
+
+    char * shoulder_string = (char *) malloc(100);
+    sprintf(shoulder_string, "shoulder_theta %f", shoulder_print_theta);
+    doHoldButtonNW(shoulder_string, x_pos, 0.0, 4, 2);
+
+    char * forearm_string = (char *) malloc(100);
+    sprintf(forearm_string, "forearm_theta %f", forearm_print_theta);
+    doHoldButtonNW(forearm_string, x_pos, -0.1, 4, 2);
+    
     
     //TODO: make it work for larger timesteps
-    float dt = 0.0005;
+    float dt = 0.00075;
+    
+    time += dt;
     
     x_pos = 0;
     if(doButtonNW("pause", x_pos, -0.5, 4, 2))
@@ -107,7 +141,7 @@ void simulateAndRender()
     
     {
         { //RK4 integrator
-            arm_derivatives k_1 = getArmDerivatives(prs, arm_shoulder_power, arm_winch_power);
+            arm_derivatives k_1 = getArmDerivatives(prs, shoulder, winch);
             arm_derivatives k_2 = evaluate(prs, k_1, dt*0.5f);
             arm_derivatives k_3 = evaluate(prs, k_2, dt*0.5f);
             arm_derivatives k_4 = evaluate(prs, k_3, dt*1.0f);

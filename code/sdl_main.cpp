@@ -5,7 +5,7 @@
 #include "ui.h"
 #include "renderer.h"
 
-#include "arm_test.h" //TODO: this should be loaded from a dll
+#include "Mk3Teleop.h" //TODO: this should be loaded from a dll
 #include "arm_simulate.h" //TODO: this should be loaded from a dll
 
 void APIENTRY glErrorCallback(GLenum source, GLenum type, uint id, GLenum severity, GLsizei length, const char * message, void * userParam)
@@ -477,6 +477,7 @@ int main(int n_arg, char * args[])
     float angle1 = 0.0;
     
     int frame_counter = 0;
+    simulatorStartMain();
     for ever
     {
         prev_left_click = left_click;
