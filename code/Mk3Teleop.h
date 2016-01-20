@@ -96,7 +96,6 @@ float winch_omega = 0.0;
 float target_arm_theta;
 float target_shoulder_theta;
 float target_inside_elbow_theta;
-float target_winch_theta;
 
 float dt;
 float old_time = time;
@@ -217,8 +216,6 @@ void JNI_main(JNIEnv * _env, jobject _self)
                     target_arm_theta = shoulder_theta-asin(forearm_length/shoudler_axis_to_end*sin(inside_elbow_theta));
                 }
             }
-            
-            target_winch_theta =  winch_theta;
             
             if(score_mode)
             {
