@@ -14,11 +14,21 @@
 #define encoder_ticks_per_radian (1440.0f/(2.0f*pi))
 #define deadzone_radius 0.1
 
-float deadzoneAdjust(float & a)
+float deadzoneAdjust(float a)
 {
     if(a > deadzone_radius) return (a-deadzone_radius)/(1-deadzone_radius);
     if(a < -deadzone_radius) return (a+deadzone_radius)/(1-deadzone_radius);
     return 0;
+}
+
+float cubicBezier(float t, float p0, float p1, float p2, float p3)
+{
+    return (1-t)*(1-t)*(1-t)*p0 + 3*t*(1-t)*(1-t)*p1 + 3*t*t*(1-t)*p2 + t*t*t*p3;
+}
+
+float quadraticBezier(float t, float p0, float p1, float p2)
+{
+    return (1-t)*(1-t)*p0 + 2*t*(1-t)*p1 + t*t*p2;
 }
 
 //PID Control: UNTESTED, may not be ported correctly (In case the built in doesn't work)

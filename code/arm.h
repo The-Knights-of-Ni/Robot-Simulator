@@ -221,6 +221,13 @@ float armHeuristic(arm_state s, float shoulder_power, float winch_power,
     return heuristic;
 }
 
+float filterArmJoystick(float a)
+{
+    a = deadzoneAdjust(a);
+    if(a == 0) return 0;
+    return cubicBezier(a*0.5+0.5, -1.0, 0.0, 0.0, 1.0);
+}
+
 void armAtVelocity(float & out_shoulder_power, float & out_winch_power,
                    float & target_arm_theta, float & target_inside_elbow_theta, v2f target_velocity,
                    float shoulder_theta, float inside_elbow_theta, float shoulder_omega, float dt)
@@ -249,7 +256,7 @@ void armAtVelocity(float & out_shoulder_power, float & out_winch_power,
     //TODO: fix divides by zero
     float target_winch_omega = 0;
     
-    target_velocity.y = deadzoneAdjust(target_velocity.y);
+    target_velocity.y = filterArmJoystick(target_velocity.y);
     if(target_velocity.y != 0)
     {
         target_winch_omega = target_velocity.y;
@@ -269,7 +276,7 @@ void armAtVelocity(float & out_shoulder_power, float & out_winch_power,
                 -1.0/2.0*forearm_length*pow(shoudler_axis_to_end_sq, -3.0/2.0)*dshoudler_axis_to_end_sq*sin(inside_elbow_theta)))
         +1/2*invSqrt(1-sq(shoulder_pulley_r*invSqrt(shoudler_axis_to_end_sq)))*shoulder_pulley_r*pow(shoudler_axis_to_end_sq, -3.0/2.0)*dshoudler_axis_to_end_sq;
 
-    target_velocity.x = deadzoneAdjust(target_velocity.x);
+    target_velocity.x = filterArmJoystick(target_velocity.x);
     if(target_velocity.x != 0)
     {
         float shoudler_axis_to_end = sqrt(sq(forearm_length)+sq(shoulder_length)
@@ -325,7 +332,7 @@ void armJointsAtVelocity(float & out_shoulder_power, float & out_winch_power,
     //TODO: this should probably be a different function
     float target_winch_omega = 0;
 
-    target_velocity.y = deadzoneAdjust(target_velocity.y);
+    target_velocity.y = filterArmJoystick(target_velocity.y);
     if(target_velocity.y != 0)
     {
         target_winch_omega = target_velocity.y;
@@ -333,8 +340,8 @@ void armJointsAtVelocity(float & out_shoulder_power, float & out_winch_power,
     }
     
     float target_shoulder_omega = 0;
-
-    target_velocity.x = deadzoneAdjust(target_velocity.x);
+    
+    target_velocity.x = filterArmJoystick(target_velocity.x);
     if(target_velocity.x != 0) //TODO: make the deadzone a constant
     {
         target_shoulder_theta = shoulder_theta;

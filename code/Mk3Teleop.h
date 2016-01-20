@@ -63,7 +63,7 @@ float hand_level_position = 0.6;
 //Hopper
 #define intake_toggle pad1.toggle(LEFT_BUMPER)
 #define intake_reverse pad1.press(RIGHT_BUMPER)
-#define hopper_tilt pad1.toggle(A) //Might make this a stick or something
+#define hopper_tilt pad2.toggle(RIGHT_BUMPER) //Might make this a stick or something
 
 //Arm
 #define shoulder_manual pad2stick1
@@ -72,7 +72,7 @@ float hand_level_position = 0.6;
 #define arm_manual_toggle pad2.toggle(Y)
 #define arm_score_mode_button pad2.press(DPAD_UP)
 #define arm_intake_mode_button pad2.press(DPAD_DOWN)
-#define precision_mode pad2.toggle(RIGHT_BUMPER)
+#define precision_mode pad2.toggle(A)
 
 //Slide
 #define slide_toggle pad1.toggle(Y)
@@ -240,6 +240,9 @@ void JNI_main(JNIEnv * _env, jobject _self)
         }
         else //Manual
         {
+            float shoudler_axis_to_end = sqrt(sq(forearm_length)+sq(shoulder_length)
+                                              -2*forearm_length*shoulder_length*cos(inside_elbow_theta));
+            target_arm_theta = shoulder_theta-asin(forearm_length/shoudler_axis_to_end*sin(inside_elbow_theta));
             target_shoulder_theta = shoulder_theta;
             target_inside_elbow_theta = inside_elbow_theta;
             
