@@ -12,6 +12,14 @@
 #define bound clamp
 //Constants
 #define encoder_ticks_per_radian (1440.0f/(2.0f*pi))
+#define deadzone_radius 0.1
+
+float deadzoneAdjust(float & a)
+{
+    if(a > deadzone_radius) return (a-deadzone_radius)/(1-deadzone_radius);
+    if(a < -deadzone_radius) return (a+deadzone_radius)/(1-deadzone_radius);
+    return 0;
+}
 
 //PID Control: UNTESTED, may not be ported correctly (In case the built in doesn't work)
 //TODO: de-OOP

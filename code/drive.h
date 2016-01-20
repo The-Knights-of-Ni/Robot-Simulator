@@ -9,7 +9,7 @@
 //TODO: Stabilized driving (if we get slammed, we should correct)
 //TODO: Delete this comment
 
-#define threshold 0.
+#define threshold 0.1
 
 #define sprocket_pitch_radius 3.13 //Inches
 #define encoderticks_per_radian 1440.0/(2*pi)
@@ -17,6 +17,7 @@
 #define encoderticks_per_cm sprocket_pitch_radius*2.54*encoderticks_per_radian
 #define acceptableAngleError 2
 
+//TODO: make all of the joystick filter functions use a consistant syntax
 void deadZone(v2f &stick)
 {
     float stick_norm = norm(stick);
@@ -32,7 +33,7 @@ void deadZone(v2f &stick)
     }//Remap non-deadzone to full range. Unnecessary if we can't move at 10% pwm
 }
 
-void squareDeadZone(v2f &stick)
+v2f squareDeadZone(v2f stick)
 {
     if (fabs(stick.data[0]) < threshold)
     {
@@ -42,6 +43,7 @@ void squareDeadZone(v2f &stick)
     {
         stick.data[1] = 0;
     }
+    return stick;
 }
 
 //this doesn't compile right now

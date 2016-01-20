@@ -2,11 +2,12 @@
 #define ARM_SIMULATE
 
 //#include "arm_robot_state_elements.h"
+#include "ui.h"
 #include "arm.h"
 #include "Button.h"
 
-static arm_state prs = {1.0, 0.0,
-                        -1.0, 0.0,
+static arm_state prs = {pi*150/180, 0.0,
+                        pi*150/180-pi+pi/6, 0.0,
                         0.0, 0.0,};
 
 float play = 0;
@@ -77,28 +78,62 @@ void simulateAndRender()
 
     virtual_joystick virtual_left_stick = doVirtualJoystickNW(virtual_left_stick_held, -0.5, -0.5, 100, 100);
     gamepad2.joystick1 = virtual_left_stick.joystick;
-    virtual_left_stick_held = virtual_left_stick.held;
+    virtual_left_stick_held = virtual_left_stick.held;    
     #endif
     
     x_pos = -0.5;
-    gamepad2.left_trigger = doHoldButtonNW("intake position", x_pos, -0.3, 4, 2);
+    gamepad2.left_trigger = doButtonNW("intake position", x_pos, -0.3, 4, 2);
     x_pos += getTextWidthInWindowUnits("intake position")+(2*4)*wx_scale;
-    gamepad2.right_trigger = doHoldButtonNW("score position", x_pos, -0.3, 4, 2);
+    gamepad2.right_trigger = doButtonNW("score position", x_pos, -0.3, 4, 2);
     x_pos += getTextWidthInWindowUnits("score position")+(2*4)*wx_scale;
-    gamepad2.buttons |= (doHoldButtonNW("manual control", x_pos, -0.3, 4, 2) << DPAD_UP);
+    gamepad2.buttons |= (doButtonNW("manual control", x_pos, -0.3, 4, 2) << DPAD_UP);
     x_pos += getTextWidthInWindowUnits("manual control")+(2*4)*wx_scale;
-    gamepad2.buttons |= (doHoldButtonNW("slow model", x_pos, -0.3, 4, 2) << A);
+    gamepad2.buttons |= (doButtonNW("slow model", x_pos, -0.3, 4, 2) << A);
+
+    if(joystick)
+    {
+        gamepad2.joystick1 = (v2f){(SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX)+0.5)/32767.5,
+                                   -(SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_LEFTY)+0.5)/32767.5};
+        
+        gamepad2.joystick2 = (v2f){(SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_RIGHTX)+0.5)/32767.5,
+                                   -(SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_RIGHTY)+0.5)/32767.5};
+
+        gamepad2.left_trigger = (SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERLEFT)+0.5)/32767.5;
+        gamepad2.right_trigger = (SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERRIGHT)+0.5)/32767.5;
+
+        gamepad2.buttons |= (SDL_JoystickGetButton(joystick, 0) << DPAD_UP);
+        gamepad2.buttons |= (SDL_JoystickGetButton(joystick, 1) << DPAD_DOWN);
+        gamepad2.buttons |= (SDL_JoystickGetButton(joystick, 10) << A);
+        gamepad2.buttons |= (SDL_JoystickGetButton(joystick, 13) << Y);
+    }
+    else
+    {
+        printf("no controller\n");
+    }
     
     ///////////////////////////////////////////
     
     float potentiometer_range = 333.33333333333333333333333333333333333f;
     
     shoulder_encoder = (prs.shoulder_theta-pi*150.0/180.0)*shoulder_gear_ratio*encoder_ticks_per_radian;
+    shoulder_encoder = ((int) shoulder_encoder); //TODO: real floor function, casting to int and back is inefficient
     winch_encoder = prs.winch_theta*winch_gear_ratio*encoder_ticks_per_radian;
+    winch_encoder = ((int) winch_encoder);
     elbow_potentiometer = ((-180+potentiometer_range*0.5-(((pi+prs.forearm_theta-prs.shoulder_theta)*180.0/pi)-360)-12)/potentiometer_range)*1023;
-
+    elbow_potentiometer = ((int) elbow_potentiometer);
+    
     x_pos = -1;
+    
+    char * left_joystick_string = (char *) malloc(100);
+    sprintf(left_joystick_string, "left joystick (%f, %f)",
+            gamepad2.joystick1.x, gamepad2.joystick1.y);
+    doHoldButtonNW(left_joystick_string, x_pos, 0.4, 4, 2);
 
+    char * right_joystick_string = (char *) malloc(100);
+    sprintf(right_joystick_string, "right joystick (%f, %f)",
+            gamepad2.joystick2.x, gamepad2.joystick2.y);
+    doHoldButtonNW(right_joystick_string, x_pos, 0.3, 4, 2);
+    
     char * time_string = (char *) malloc(100);
     sprintf(time_string, "time %f", time);
     doHoldButtonNW(time_string, x_pos, 0.2, 4, 2);
@@ -115,9 +150,8 @@ void simulateAndRender()
     sprintf(forearm_string, "forearm_theta %f", forearm_print_theta);
     doHoldButtonNW(forearm_string, x_pos, -0.1, 4, 2);
     
-    
     //TODO: make it work for larger timesteps
-    float dt = 0.001;
+    float dt = 0.00075;
     
     time += dt;
     
@@ -157,7 +191,8 @@ void simulateAndRender()
             prs = linear_integrate(prs, d, dt);
         }
     }
-    
+
+    #if 0
     render_list[n_to_render].model = 0;
     render_list[n_to_render].position = (v3f) {shoulder_length/2*cos(prs.shoulder_theta),
                                                -20.0,
@@ -166,9 +201,10 @@ void simulateAndRender()
     n_to_render++;
     
     render_list[n_to_render].model = 0;
-    render_list[n_to_render].position = (v3f) {shoulder_length*cos(prs.shoulder_theta)+forearm_length/2*cos(prs.forearm_theta),
+    render_list[n_to_render].position = (v3f) {shoulder_length*cos(prs.shoulder_theta)
+                                               +((forearm_length-shoulder_length)/2+forearm_length/2)*cos(prs.forearm_theta),
                                                -20.0,
-                                               shoulder_length*sin(prs.shoulder_theta)+forearm_length/2*sin(prs.forearm_theta)};
+                                               shoulder_length*sin(prs.shoulder_theta)+((forearm_length-shoulder_length)/2+forearm_length/2)*sin(prs.forearm_theta)};
     render_list[n_to_render].orientation = (v4f) {0.0, -sin(prs.forearm_theta/2), 0.0, cos(prs.forearm_theta/2)};
     n_to_render++;
     
@@ -178,6 +214,29 @@ void simulateAndRender()
                                                0.0};
     render_list[n_to_render].orientation = (v4f) {0.0, -sin(prs.winch_theta/2), 0.0, cos(prs.winch_theta/2)};
     n_to_render++;
+    #else //render mirrored
+        render_list[n_to_render].model = 0;
+    render_list[n_to_render].position = (v3f) {-shoulder_length/2*cos(prs.shoulder_theta),
+                                               -20.0,
+                                               shoulder_length/2*sin(prs.shoulder_theta)};
+    render_list[n_to_render].orientation = (v4f) {0.0, sin(prs.shoulder_theta/2), 0.0, cos(prs.shoulder_theta/2)};
+    n_to_render++;
+    
+    render_list[n_to_render].model = 0;
+    render_list[n_to_render].position = (v3f) {-shoulder_length*cos(prs.shoulder_theta)
+                                               -((forearm_length-shoulder_length)/2+forearm_length/2)*cos(prs.forearm_theta),
+                                               -20.0,
+                                               shoulder_length*sin(prs.shoulder_theta)+((forearm_length-shoulder_length)/2+forearm_length/2)*sin(prs.forearm_theta)};
+    render_list[n_to_render].orientation = (v4f) {0.0, sin(prs.forearm_theta/2), 0.0, cos(prs.forearm_theta/2)};
+    n_to_render++;
+    
+    render_list[n_to_render].model = 0;
+    render_list[n_to_render].position = (v3f) {0.0,
+                                               -20.0,
+                                               0.0};
+    render_list[n_to_render].orientation = (v4f) {0.0, sin(prs.winch_theta/2), 0.0, cos(prs.winch_theta/2)};
+    n_to_render++;
+    #endif
 }
 
 #endif

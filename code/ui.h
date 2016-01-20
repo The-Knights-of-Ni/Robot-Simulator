@@ -25,6 +25,8 @@ static float wy_scale = 2.0/window_height;
 #include <stdio.h>
 #include <SDL.h>
 
+SDL_Joystick * joystick = 0;
+
 bool left_click = 0;
 bool prev_left_click = 0;
 
@@ -245,4 +247,5 @@ virtual_joystick doVirtualJoystickNW(bool held, float x0, float y1, float width,
     
     return (virtual_joystick){joystick, held};
 }
+
 #endif

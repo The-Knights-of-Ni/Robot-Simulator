@@ -109,7 +109,7 @@ inline void bindVertexAndIndexBuffers(uint vb, uint ib)
 
 int main(int n_arg, char * args[])
 {
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK);
     
     SDL_Window * window = SDL_CreateWindow("Simulator",
                                            SDL_WINDOWPOS_UNDEFINED,
@@ -122,6 +122,25 @@ int main(int n_arg, char * args[])
     {
         printf("Could not create window: %s\n", SDL_GetError());
         return 1;
+    }
+    
+    printf("%d joysticks found\n", SDL_NumJoysticks());
+    if(SDL_NumJoysticks() > 0)
+    {
+        joystick = SDL_JoystickOpen(0);
+
+        if(joystick)
+        {
+            printf("Opened Joystick 0\n");
+            printf("Name: %s\n", SDL_JoystickNameForIndex(0));
+            printf("Number of Axes: %d\n", SDL_JoystickNumAxes(joystick));
+            printf("Number of Buttons: %d\n", SDL_JoystickNumButtons(joystick));
+            printf("Number of Balls: %d\n", SDL_JoystickNumBalls(joystick));
+        }
+        else
+        {
+            printf("could not open joystick");
+        }
     }
     
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
