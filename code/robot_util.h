@@ -1,8 +1,7 @@
 #ifndef ROBOT_UTIL
 #define ROBOT_UTIL
 
-#include "misc.h"
-#include "meth.h"
+#include "native_path.h"
 #include "ui.h"
 #include "renderer.h"
 

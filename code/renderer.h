@@ -1,3 +1,6 @@
+/*
+Renderer.h - Handles interfacing with gl fragments and vertices
+*/
 #ifndef RENDERER
 #define RENDERER
 

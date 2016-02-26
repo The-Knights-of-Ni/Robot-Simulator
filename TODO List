@@ -1,0 +1,26 @@
+Framework
+	Color in models
+	Static model loading
+	2D drawing
+	Resizing window shouldn't break everything
+	Simulate robot and plug native code in
+	Replay from sensor log
+Field
+	Draw field at scale
+	Opposing robots
+	Blocks/Balls
+	Collisions with walls
+	Random beacon colors
+Autonomous
+	Run auto
+	Step through routine
+	timing
+	spline computing
+Interface
+	Popups for information/configuration
+	Cleaner/standardized
+	Keymap
+	Car style performance readout
+	Nicer background
+Performance
+	Fixed frame rate

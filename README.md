@@ -9,7 +9,6 @@ A simulator for the FIRST Tech Challenge robotics competition
                 eg.
                 [platform]_main.cpp //platform layers
                 simulation.h //main simulation code
-                meth.h //math utilities, renamed to avoid confussion with the standard math.h
             build.bat
             build.sh
         libraries
