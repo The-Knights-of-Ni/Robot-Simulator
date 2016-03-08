@@ -39,7 +39,7 @@ void simulateAndRender()
 	if(joystick)
     {
 		//TODO: Make this for the drive instead of the arm, or just a function for every button/stick/trigger.
-        simulatorgamepad2.joystick1 = (v2f){(SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX)+0.5)/32767.5,
+    	simulatorgamepad2.joystick1 = (v2f){(SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_LEFTX)+0.5)/32767.5,
                                    -(SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_LEFTY)+0.5)/32767.5};
 
         simulatorgamepad2.joystick2 = (v2f){(SDL_JoystickGetAxis(joystick, SDL_CONTROLLER_AXIS_RIGHTX)+0.5)/32767.5,
@@ -85,7 +85,7 @@ void simulateAndRender()
 
     timeSim += dt;
 	v2f sticks = (v2f) {simulatorgamepad2.joystick1.x, -simulatorgamepad2.joystick1.y};
-	v2f modified = smoothJoysticks(sticks, 0, 0.2, 0.8, 1);
+	v2f modified = smoothJoysticks(sticks, 0, 0.2, 0.8, 1).stick;
 	rabbit.left_drive_sim += -modified.y - modified.x;//This is real teleop code TODO: Interface between Mk4Teleop.cpp and this struct
 	rabbit.right_drive_sim += -modified.y + modified.x;
 	simulateRobot(rabbit);

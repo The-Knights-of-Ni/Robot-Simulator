@@ -565,29 +565,29 @@ int main(int n_arg, char * args[])
             }
         }
 
-        angle0 += 0.0005;//3.1415926535897932384626433832795/4.0;
-        if(angle0 >= 2*3.1416)
-        {
-            angle0 -= 2*3.1415926535897932384626433832795;
-        }
-        float sine0 = sin(angle0);
-        float cosine0 = cos(angle0);
-
-        angle1 += 0.00005;
-        if(angle1 >= 2*3.1416)
-        {
-            angle1 -= 2*3.1415926535897932384626433832795;
-        }
-        float sine1 = sin(angle1);
-        float cosine1 = cos(angle1);
-
+        // angle0 += 0.0005;//3.1415926535897932384626433832795/4.0;
+        // if(angle0 >= 2*3.1416)
+        // {
+        //     angle0 -= 2*3.1415926535897932384626433832795;
+        // }
+        // float sine0 = sin(angle0);
+        // float cosine0 = cos(angle0);
+		//
+        // angle1 += 0.00005;
+        // if(angle1 >= 2*3.1416)
+        // {
+        //     angle1 -= 2*3.1415926535897932384626433832795;
+        // }
+        // float sine1 = sin(angle1);
+        // float cosine1 = cos(angle1);
+		//
         // for(int i = 0; i < 100; i++)
         // {
         //     render_list[n_to_render].model = 0;
         //     render_list[n_to_render].position = (v3f) {1.0*cos(angle0+sin(angle0)*(100-i)), -1.0*(100-i), sin(angle0+sin(angle0)*(100-i))};
         //     render_list[n_to_render].orientation = (v4f) {cosine1*cosine0, sine1*cosine0, 0.0, -sine0};
         //     n_to_render++;
-
+		//
         //     render_list[n_to_render].model = 0;
         //     render_list[n_to_render].position = (v3f) {-1.0*cos(angle0+sin(angle0)*(100-i)), -1.0*(100-i), -sin(angle0+sin(angle0)*(100-i))};
         //     render_list[n_to_render].orientation = (v4f) {cosine1*cosine0, sine1*cosine0, 0.0, sine0};
