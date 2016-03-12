@@ -10,6 +10,7 @@
 #include "Mk3Teleop_robot_state_elements.h"
 #include "drive_simulate.h" //TODO: this should be loaded from a dll
 
+
 void APIENTRY glErrorCallback(GLenum source, GLenum type, uint id, GLenum severity, GLsizei length, const char * message, void * userParam)
 {
     printf("message: %s\n", message);
@@ -144,6 +145,8 @@ int main(int n_arg, char * args[])
             printf("could not open joystick");
         }
     }
+	
+	MotionProfileIO = fopen("MotionProfile.txt", "w");
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -648,7 +651,7 @@ int main(int n_arg, char * args[])
 
         SDL_GL_SwapWindow(window);
     }
-
+	fclose(MotionProfileIO);
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();
