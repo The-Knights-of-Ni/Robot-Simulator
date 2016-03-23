@@ -148,28 +148,32 @@ int main(int n_arg, char * args[])
 	/*START FILE IO INFRASTRUCTURE*/
 	MotionProfileIO = fopen("MotionProfile.txt", "w");
     Config config;
-    const float kWheelbaseWidth = 2;
+    const float kWheelbaseWidth = 14.325;
 
       config.dt = 0.01;
-      config.max_acc = 8.0;
-      config.max_jerk = 50.0;
-      config.max_vel = 10.0;
+      config.max_acc = 84;
+      config.max_jerk = 168;
+      config.max_vel = 21;
       // Path name must be a valid Java class name.
       // Description of this auto mode path.
       // Remember that this is for the GO LEFT CASE!
       waypointSequence p(10);
       p.addWaypoint(waypoint(0, 0, 0));
-      p.addWaypoint(waypoint(2.5, 0, 0));
-      p.addWaypoint(waypoint(10.5, 8, pi/12.0));
-      p.addWaypoint(waypoint(13.75, 9.5, 0.0/* * Math.PI/18.0*/));
+      p.addWaypoint(waypoint(5, 0, 0));
+      p.addWaypoint(waypoint(10, 0, 0));
+      //p.addWaypoint(waypoint(13.75, 9.5, 0.0/* * Math.PI/18.0*/));
 
       path drivePath = makePath(p, config, kWheelbaseWidth);
+
       TrajectoryFollower leftTraj;
-      leftTraj.setTrajectory(drivePath.go_left_pair.left);
       TrajectoryFollower rightTraj;
+
+      const float robot_max_velocity = 21;
+      leftTraj.setTrajectory(drivePath.go_left_pair.left);
       rightTraj.setTrajectory(drivePath.go_left_pair.right);
-      leftTraj.configure(0, 0, 0, 10, 4);
-      rightTraj.configure(0, 0, 0, 10, 4);
+
+      leftTraj.configure(0, 0, 0, 1/robot_max_velocity, 0);
+      rightTraj.configure(0, 0, 0, 1/robot_max_velocity, 0);
       v4f leftTrajStatus = (v4f) {0,0,0,0};
       v4f rightTrajStatus = (v4f) {0,0,0,0};
       float motionProfileIOTime = 0.0;
@@ -680,8 +684,8 @@ int main(int n_arg, char * args[])
         leftTrajStatus = leftTraj.positionCalc(leftTrajStatus.w);
         rightTrajStatus = rightTraj.positionCalc(rightTrajStatus.w);
         motionProfileIOTime += motionProfileIOdt;
-        fprintf(MotionProfileIO,"%.2f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", motionProfileIOTime, leftTrajStatus.x,
-        leftTrajStatus.y, leftTrajStatus.z, rightTrajStatus.x, rightTrajStatus.y, rightTrajStatus.z);
+        fprintf(MotionProfileIO,"%.2f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f,%.4f\n", motionProfileIOTime, leftTrajStatus.x,
+        leftTrajStatus.y, leftTrajStatus.z, rightTrajStatus.x, rightTrajStatus.y, rightTrajStatus.z, leftTraj.calculate(leftTrajStatus.w),rightTraj.calculate(rightTrajStatus.w));
         if(motionProfileIOTime >= 1)
         {
             printf("Safe to close\n");
