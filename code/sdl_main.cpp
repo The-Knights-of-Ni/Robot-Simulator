@@ -145,9 +145,37 @@ int main(int n_arg, char * args[])
             printf("could not open joystick");
         }
     }
-	
+	/*START FILE IO INFRASTRUCTURE*/
 	MotionProfileIO = fopen("MotionProfile.txt", "w");
+    Config config;
+    const float kWheelbaseWidth = 2;
 
+      config.dt = 0.01;
+      config.max_acc = 8.0;
+      config.max_jerk = 50.0;
+      config.max_vel = 10.0;
+      // Path name must be a valid Java class name.
+      // Description of this auto mode path.
+      // Remember that this is for the GO LEFT CASE!
+      waypointSequence p(10);
+      p.addWaypoint(waypoint(0, 0, 0));
+      p.addWaypoint(waypoint(2.5, 0, 0));
+      p.addWaypoint(waypoint(10.5, 8, pi/12.0));
+      p.addWaypoint(waypoint(13.75, 9.5, 0.0/* * Math.PI/18.0*/));
+
+      path drivePath = makePath(p, config, kWheelbaseWidth);
+      TrajectoryFollower leftTraj;
+      leftTraj.setTrajectory(drivePath.go_left_pair.left);
+      TrajectoryFollower rightTraj;
+      rightTraj.setTrajectory(drivePath.go_left_pair.right);
+      leftTraj.configure(0, 0, 0, 10, 4);
+      rightTraj.configure(0, 0, 0, 10, 4);
+      v4f leftTrajStatus = (v4f) {0,0,0,0};
+      v4f rightTrajStatus = (v4f) {0,0,0,0};
+      float motionProfileIOTime = 0.0;
+      float motionProfileIOdt = 0.01;
+      fprintf(MotionProfileIO,"Start of Path: \n");
+    /*END FILE IO INFRASTRUCTURE*/
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
@@ -647,8 +675,17 @@ int main(int n_arg, char * args[])
         }
 
         if((frame_counter++)%20 == 0) JNI_main(0, (jobject){});
-        simulateAndRender();
 
+        simulateAndRender();
+        leftTrajStatus = leftTraj.positionCalc(leftTrajStatus.w);
+        rightTrajStatus = rightTraj.positionCalc(rightTrajStatus.w);
+        motionProfileIOTime += motionProfileIOdt;
+        fprintf(MotionProfileIO,"%.2f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f\n", motionProfileIOTime, leftTrajStatus.x,
+        leftTrajStatus.y, leftTrajStatus.z, rightTrajStatus.x, rightTrajStatus.y, rightTrajStatus.z);
+        if(motionProfileIOTime >= 1)
+        {
+            printf("Safe to close\n");
+        }
         SDL_GL_SwapWindow(window);
     }
 	fclose(MotionProfileIO);

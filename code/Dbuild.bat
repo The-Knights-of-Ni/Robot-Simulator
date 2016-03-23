@@ -8,6 +8,6 @@ clang++ -Wall -Wno-c++11-compat-deprecated-writable-strings -Wno-unused-variable
 
 cd ../resources
 cd ..\win32_build
-gdb simulator
 cd ..\resources
+gdb ..\win32_build\simulator
 popd

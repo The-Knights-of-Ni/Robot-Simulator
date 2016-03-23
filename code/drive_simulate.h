@@ -81,6 +81,7 @@ struct trapezoidalMotionProfile
 
 };
 FILE *MotionProfileIO;
+
 bool virtual_right_stick_held = false;
 bool virtual_left_stick_held = false;
 
@@ -90,13 +91,15 @@ float driveangle = 0.0;
 float driveforward = 0.0;
 drivebase rabbit((v3f) {17.0, 17.0, 5.0}, 0, (v3f) {10, 10, -20}, drive_base, 10.0, (v3f) {8.5, 8.5, 2.5}, 1.0);
 const float travel_dist = 40;
-trapezoidalMotionProfile path(-25, 10, travel_dist, 0);
+trapezoidalMotionProfile profile(-25, 10, travel_dist, 0);
+
+#define wheelbase (14.325)
 void simulateAndRender()
 {
 	if(!initPosition)
 	{
-        quinticSpline spline(0, 0, 0, 1, 1, pi/4);
-        printf("a: %f, b: %f, c: %f, d: %f, e: %f, knot_distance: %f\n", spline.a, spline.b, spline.c, spline.d, spline.e, spline.knot_distance);
+        //quinticSpline spline(0, 0, 0, 1, 1, pi/4);
+        //printf("a: %f, b: %f, c: %f, d: %f, e: %f, knot_distance: %f\n", spline.a, spline.b, spline.c, spline.d, spline.e, spline.knot_distance);
 		initPosition = true;
 	}
 	float x_pos = 0; //Using this for GUI offsets
@@ -157,12 +160,16 @@ void simulateAndRender()
 	doHoldButtonNW(time_string, x_pos, 0.2, 4, 2);
 
 	float dt = 0.00075;
-
-
+    /*
+    if(!setjmp(simulationPoint))
+    {
+        jniMain();
+    }
+    */
     timeSim += dt;
-	v3f data = path.getData(timeSim);
-	fprintf(MotionProfileIO,"%.6f, %.4f, %.4f, %.4f\n", timeSim, data.x, data.y, data.z);
-	if(data.x >= travel_dist) printf("Safe to terminate\n");
+	//v3f data = profile.getData(timeSim);
+	//fprintf(MotionProfileIO,"%.6f, %.4f, %.4f, %.4f\n", timeSim, data.x, data.y, data.z);
+	//if(data.x >= travel_dist) printf("Safe to terminate\n");
 
 	v2f sticks = (v2f) {simulatorgamepad2.joystick1.x, -simulatorgamepad2.joystick1.y};
 	v2f modified = smoothJoysticks(sticks, 0, 0.2, 0.8, 1).stick;
