@@ -151,16 +151,16 @@ int main(int n_arg, char * args[])
     const float kWheelbaseWidth = 14.325;
 
       config.dt = 0.01;
-      config.max_acc = 84;
-      config.max_jerk = 168;
-      config.max_vel = 21;
+      config.max_acc = 100;
+      config.max_jerk = 110;
+      config.max_vel = 32.34*0.7;
       // Path name must be a valid Java class name.
       // Description of this auto mode path.
       // Remember that this is for the GO LEFT CASE!
       waypointSequence p(10);
       p.addWaypoint(waypoint(0, 0, 0));
-      p.addWaypoint(waypoint(5, 0, 0));
-      p.addWaypoint(waypoint(10, 0, 0));
+      p.addWaypoint(waypoint(80, 0, 0));
+      p.addWaypoint(waypoint(130, -15, pi/4));
       //p.addWaypoint(waypoint(13.75, 9.5, 0.0/* * Math.PI/18.0*/));
 
       path drivePath = makePath(p, config, kWheelbaseWidth);
@@ -172,8 +172,8 @@ int main(int n_arg, char * args[])
       leftTraj.setTrajectory(drivePath.go_left_pair.left);
       rightTraj.setTrajectory(drivePath.go_left_pair.right);
 
-      leftTraj.configure(0, 0, 0, 1/robot_max_velocity, 0);
-      rightTraj.configure(0, 0, 0, 1/robot_max_velocity, 0);
+      leftTraj.configure(0, 0, 0, 1/robot_max_velocity, 1/100.0, 0);
+      rightTraj.configure(0, 0, 0, 1/robot_max_velocity, 1/100.0, 0);
       v4f leftTrajStatus = (v4f) {0,0,0,0};
       v4f rightTrajStatus = (v4f) {0,0,0,0};
       float motionProfileIOTime = 0.0;
@@ -685,7 +685,7 @@ int main(int n_arg, char * args[])
         rightTrajStatus = rightTraj.positionCalc(rightTrajStatus.w);
         motionProfileIOTime += motionProfileIOdt;
         fprintf(MotionProfileIO,"%.2f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f,%.4f\n", motionProfileIOTime, leftTrajStatus.x,
-        leftTrajStatus.y, leftTrajStatus.z, rightTrajStatus.x, rightTrajStatus.y, rightTrajStatus.z, leftTraj.calculate(leftTrajStatus.w),rightTraj.calculate(rightTrajStatus.w));
+        leftTrajStatus.y, leftTrajStatus.z, rightTrajStatus.x, rightTrajStatus.y, rightTrajStatus.z, leftTraj.calculate(leftTrajStatus.w, leftTrajStatus.z),rightTraj.calculate(rightTrajStatus.w, rightTrajStatus.z));
         if(motionProfileIOTime >= 1)
         {
             printf("Safe to close\n");
